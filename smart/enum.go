@@ -3,6 +3,7 @@ package smart
 import (
 	"encoding/binary"
 	"fmt"
+	"strings"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -105,7 +106,7 @@ func parseStorageDescriptor(b []byte) (vendor, product, revision, serial string,
 		for end < uint32(len(b)) && b[end] != 0 {
 			end++
 		}
-		return string(b[off:end])
+		return strings.TrimSpace(string(b[off:end]))
 	}
 	vendor = readAt(vendorOff)
 	product = readAt(productOff)
