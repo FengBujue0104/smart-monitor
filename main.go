@@ -103,12 +103,9 @@ func mergeFallbackDisks(primary, fallback []smart.Disk) []smart.Disk {
 	return result
 }
 
-// isAdmin 简单检测：尝试打开 \\.\PhysicalDrive0；失败则视为无权限。
+// isAdmin checks the process token directly. Opening a physical drive is not a
+// reliable privilege check: a healthy elevated process may still be denied by
+// a controller, policy, or an offline disk.
 func isAdmin() bool {
-	h, err := smart.OpenDeviceForTest(`\\.\PhysicalDrive0`)
-	if err != nil {
-		return false
-	}
-	h.Close()
-	return true
+	return windows.GetCurrentProcessToken().IsElevated()
 }

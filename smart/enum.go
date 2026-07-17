@@ -10,9 +10,6 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// 让 deviceHandle 内部使用 windows.Handle
-type windowsHandle = windows.Handle
-
 // STORAGE_PROPERTY_QUERY 用于 IOCTL_STORAGE_QUERY_PROPERTY。
 // 布局：
 //
@@ -117,19 +114,6 @@ func parseStorageDescriptor(b []byte) (vendor, product, revision, serial string,
 	serial = readAt(serialOff)
 	return
 }
-
-// OpenDeviceForTest 是 openDevice 的导出版（供 main 包做「是否管理员」探测用）。
-func OpenDeviceForTest(path string) (closer interface{ Close() error }, err error) {
-	h, err := openDevice(path)
-	if err != nil {
-		return nil, err
-	}
-	return &deviceHandle{h}, nil
-}
-
-type deviceHandle struct{ h windowsHandle }
-
-func (d *deviceHandle) Close() error { return windows.CloseHandle(d.h) }
 
 // Discover 枚举 PhysicalDrive 0..maxPhysDrives-1，返回每块盘的统一 Disk（仅元数据 + 已采集的健康属性）。
 // 采集顺序：
