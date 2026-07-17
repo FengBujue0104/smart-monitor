@@ -3,6 +3,7 @@ package smart
 import (
 	"encoding/binary"
 	"fmt"
+	"log"
 	"strings"
 	"unsafe"
 
@@ -185,7 +186,7 @@ func Discover() ([]Disk, error) {
 			if d.Model == "" || d.Model == "Unknown" {
 				m, s, fw, idErr := ReadIdentify(h, byte(i))
 				if idErr != nil {
-					fmt.Printf("[disk%d] IDENTIFY_ERR: %v\n", i, idErr)
+					log.Printf("[disk%d] IDENTIFY_ERR: %v", i, idErr)
 				} else if m != "" {
 					d.Model = m
 					d.Serial = s
@@ -198,10 +199,10 @@ func Discover() ([]Disk, error) {
 				d.SmartStatusKnown = true
 				d.SmartStatusPassed = status
 			} else {
-				fmt.Printf("[disk%d] SMART_STATUS_ERR: %v\n", i, statusErr)
+				log.Printf("[disk%d] SMART_STATUS_ERR: %v", i, statusErr)
 			}
 			if smErr != nil {
-				fmt.Printf("[disk%d] SMART_DATA_ERR: %v\n", i, smErr)
+				log.Printf("[disk%d] SMART_DATA_ERR: %v", i, smErr)
 			} else {
 				d.SMARTChecksumKnown = true
 				d.SMARTChecksumValid = checksumValid
