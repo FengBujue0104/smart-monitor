@@ -46,7 +46,9 @@ Windows 10/11 兼容、单 .exe 分发。读取物理硬盘的 S.M.A.R.T 属性�
 | Media_Data_Integrity_Errors ("0E") | != 0 | 严重 |
 | Percentage_Used | >= 100% 严重；>= 80% 警告 |
 | Temperature | > 60°C | 严重 |
+| Temperature Sensor 1–8 | > 60°C | 严重 |
 | Critical_Warning | != 0 | 严重 |
+| Endurance_Group_Critical_Warning_Summary | != 0 | 严重 |
 | Available_Spare < Threshold | | 严重 |
 | Read_Only_Mode | != 0 | 严重 |
 
