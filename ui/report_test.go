@@ -27,6 +27,9 @@ func TestAttrDisplaySeparatesRawAndNormalizedValues(t *testing.T) {
 	if attrCurrentStr(nvmeTemp) != "-" || attrWorstStr(nvmeTemp) != "-" {
 		t.Fatal("NVMe should not display ATA normalized columns")
 	}
+	if got := attrRawStr(smart.Attr{ID: smart.NVMeTemperature, Kind: "nvme"}); got != "N/A" {
+		t.Fatalf("unexpected unavailable NVMe temperature display: %q", got)
+	}
 
 	nvmeWrite := smart.Attr{ID: smart.NVMeDataUnitsWritten, Raw: 1000000, Kind: "nvme"}
 	if got := attrRawStr(nvmeWrite); !strings.Contains(got, "0.51 TB") || !strings.Contains(got, "1000000 units") {

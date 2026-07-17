@@ -271,6 +271,9 @@ func attrRawStr(a smart.Attr) string {
 	if a.Kind == "nvme" {
 		switch a.ID {
 		case smart.NVMeTemperature:
+			if a.Raw == 0 {
+				return "N/A"
+			}
 			return fmt.Sprintf("%d°C", int(a.Raw)-273)
 		case smart.NVMeAvailableSpare, smart.NVMeAvailSpareThresh, smart.NVMePercentUsed:
 			return fmt.Sprintf("%d%%", a.Raw)
@@ -288,6 +291,9 @@ func attrRawStr(a smart.Attr) string {
 			return nvmeCounterStr(a)
 		}
 		if a.ID >= smart.NVMeTemperatureSensor1 && a.ID <= smart.NVMeTemperatureSensor8 {
+			if a.Raw == 0 {
+				return "N/A"
+			}
 			return fmt.Sprintf("%d°C", int(a.Raw)-273)
 		}
 	}
