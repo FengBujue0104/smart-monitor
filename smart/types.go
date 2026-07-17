@@ -14,6 +14,7 @@ const (
 type Attr struct {
 	ID      int    // ATA 属性 ID（NVMe 字段用伪 ID，见下方 NVMe* 常量）
 	Name    string // 属性名
+	Flags   uint16 // ATA SMART 属性标志位（NVMe 为 0）
 	Raw     uint64 // 原始值（已解码为可用数值）
 	RawHigh uint64 // 128 位 NVMe 计数的高 64 位，ATA/普通字段为 0
 	Value   int    // 归一化当前值（ATA: 1-253；NVMe 不使用）

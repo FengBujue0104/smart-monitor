@@ -12,6 +12,9 @@ func TestAttrDisplaySeparatesRawAndNormalizedValues(t *testing.T) {
 	if got := attrRawStr(ataTemp); got != "42°C (min 48°C, max 70°C)" {
 		t.Fatalf("unexpected ATA raw display: %q", got)
 	}
+	if got := attrFlagsStr(smart.Attr{Flags: 0x35, Kind: "ata"}); got != "0x0035" {
+		t.Fatalf("unexpected ATA flags display: %q", got)
+	}
 	if got := attrCurrentStr(ataTemp); got != "100" || attrWorstStr(ataTemp) != "90" {
 		t.Fatalf("unexpected ATA normalized display: current=%q worst=%q", got, attrWorstStr(ataTemp))
 	}

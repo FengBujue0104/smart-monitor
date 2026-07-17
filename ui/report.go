@@ -50,6 +50,7 @@ func RunReport(disks []smart.Disk, violations []health.Violation) error {
 					{Title: "磁盘", Width: 200},
 					{Title: "类型", Width: 50},
 					{Title: "属性ID", Width: 60},
+					{Title: "标志", Width: 70},
 					{Title: "属性名", Width: 220},
 					{Title: "Raw值", Width: 150},
 					{Title: "当前值", Width: 80},
@@ -106,6 +107,7 @@ type reportRow struct {
 	disk     string
 	kind     string
 	id       int
+	flags    string
 	name     string
 	raw      string
 	current  string
@@ -137,6 +139,7 @@ func (m *reportModel) build() {
 				disk:     dname,
 				kind:     string(d.Kind),
 				id:       a.ID,
+				flags:    attrFlagsStr(a),
 				name:     a.Name,
 				raw:      attrRawStr(a),
 				current:  attrCurrentStr(a),
@@ -184,16 +187,18 @@ func (m *reportModel) Value(row, col int) interface{} {
 	case 2:
 		return fmt.Sprintf("0x%02X", r.id)
 	case 3:
-		return r.name
+		return r.flags
 	case 4:
-		return r.raw
+		return r.name
 	case 5:
-		return r.current
+		return r.raw
 	case 6:
-		return r.worst
+		return r.current
 	case 7:
-		return r.limit
+		return r.worst
 	case 8:
+		return r.limit
+	case 9:
 		return r.status
 	}
 	return ""
@@ -290,6 +295,13 @@ func attrCurrentStr(a smart.Attr) string {
 		return "-"
 	}
 	return fmt.Sprintf("%d", a.Value)
+}
+
+func attrFlagsStr(a smart.Attr) string {
+	if a.Kind == "nvme" {
+		return "-"
+	}
+	return fmt.Sprintf("0x%04X", a.Flags)
 }
 
 func attrWorstStr(a smart.Attr) string {

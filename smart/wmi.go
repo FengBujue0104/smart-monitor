@@ -210,11 +210,13 @@ func parseWMIAttributes(data []byte) []Attr {
 		}
 		value := int(data[off+3])
 		worst := int(data[off+4])
+		flags := uint16(data[off+1]) | uint16(data[off+2])<<8
 		raw := uint64(data[off+5]) | uint64(data[off+6])<<8 | uint64(data[off+7])<<16 |
 			uint64(data[off+8])<<24 | uint64(data[off+9])<<32 | uint64(data[off+10])<<48
 		attrs = append(attrs, Attr{
 			ID:    id,
 			Name:  ATAAttrName(id),
+			Flags: flags,
 			Raw:   raw,
 			Value: value,
 			Worst: worst,

@@ -217,6 +217,7 @@ func parseSMARTData(data []byte) []Attr {
 		}
 		value := int(data[off+3])
 		worst := int(data[off+4])
+		flags := uint16(data[off+1]) | uint16(data[off+2])<<8
 		// SMART raw 值为 48 位（6 字节），但某些厂商打包为 32 位。
 		// 低 48 位取自 data[off+5..off+11)，小端。
 		var raw uint64
@@ -227,6 +228,7 @@ func parseSMARTData(data []byte) []Attr {
 		attrs = append(attrs, Attr{
 			ID:    id,
 			Name:  ATAAttrName(id),
+			Flags: flags,
 			Raw:   raw,
 			Value: value,
 			Worst: worst,
