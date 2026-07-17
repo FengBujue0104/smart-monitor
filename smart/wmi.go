@@ -43,8 +43,8 @@ type wmiDiskDrive struct {
 	PNPDeviceID      string
 }
 
-// DiscoverWMI 通过 WMI 枚举磁盘并读取 SMART 属性。
-// 失败时回退到 IOCTL 路径（Discover）。
+// DiscoverWMI 通过 WMI 枚举磁盘并读取可用的 SMART 属性。
+// 即使 root\WMI SMART 类不可用，只要 Win32_DiskDrive 可查询，仍返回磁盘元数据。
 func DiscoverWMI() ([]Disk, error) {
 	// 1. 读 Win32_DiskDrive 获取型号/序列/固件/容量
 	var drives []wmiDiskDrive
@@ -57,9 +57,7 @@ func DiscoverWMI() ([]Disk, error) {
 	// 2. 读 SMART 数据
 	var smartData []wmiFailurePredictData
 	q2 := wmi.CreateQuery(&smartData, "", "MSStorageDriver_FailurePredictData")
-	if err := wmi.QueryNamespace(q2, &smartData, `root\WMI`); err != nil {
-		return nil, fmt.Errorf("FailurePredictData query: %w", err)
-	}
+	_ = wmi.QueryNamespace(q2, &smartData, `root\WMI`) // 只影响属性，不应丢弃已枚举磁盘
 
 	// 3. 读阈值
 	var thresholds []wmiFailurePredictThresholds
@@ -94,19 +92,11 @@ func DiscoverWMI() ([]Disk, error) {
 			Firmware: cleanWMIString(drv.FirmwareRevision),
 			SizeGB:   float64(drv.Size) / (1024 * 1024 * 1024),
 		}
-		if drv.InterfaceType == "USB" {
-			d.Kind = KindATA // USB 桥接仍尝试 ATA
-		} else {
-			d.Kind = KindATA
-		}
-
 		// 通过 InstanceName 关联：Win32_DiskDrive.DeviceID 与 FailurePredictData.InstanceName 含厂商信息
 		// 简化：按 Index 顺序匹配（InstanceName 通常按磁盘顺序）
 		// 更可靠：用 Model+Serial 子串匹配
 		data, instanceName := findDataForDrive(dataMap, drv)
-		if strings.Contains(strings.ToLower(drv.InterfaceType), "nvme") || strings.Contains(strings.ToLower(instanceName), "nvme") {
-			d.Kind = KindNVMe
-		}
+		d.Kind = classifyWMIDisk(drv, instanceName)
 		if predictFailure, ok := findStatusForDrive(statusMap, drv); ok {
 			d.SmartStatusKnown = true
 			d.SmartStatusPassed = !predictFailure
@@ -121,6 +111,14 @@ func DiscoverWMI() ([]Disk, error) {
 		disks = append(disks, d)
 	}
 	return disks, nil
+}
+
+func classifyWMIDisk(drv wmiDiskDrive, instanceName string) DiskKind {
+	identity := strings.ToLower(drv.InterfaceType + " " + drv.PNPDeviceID + " " + instanceName)
+	if strings.Contains(identity, "nvme") {
+		return KindNVMe
+	}
+	return KindATA // USB/SCSI 桥接盘的 WMI SMART 表沿用 ATA 格式
 }
 
 func applyWMIATAData(d *Disk, data, thresholds []byte) {

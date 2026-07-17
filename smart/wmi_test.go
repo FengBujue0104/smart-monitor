@@ -81,3 +81,10 @@ func TestApplyWMIATADataChecksSMARTChecksum(t *testing.T) {
 		t.Fatalf("expected invalid WMI SMART checksum: %+v", d)
 	}
 }
+
+func TestClassifyWMIDiskDetectsNVMeWithoutSMARTDataInstance(t *testing.T) {
+	drv := wmiDiskDrive{PNPDeviceID: `SCSI\Disk&Ven_NVMe&Prod_SSD\1`}
+	if got := classifyWMIDisk(drv, ""); got != KindNVMe {
+		t.Fatalf("WMI disk kind = %q, want NVMe", got)
+	}
+}

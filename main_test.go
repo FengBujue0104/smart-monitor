@@ -44,12 +44,3 @@ func TestMergeFallbackDisksReplacesCorruptATASMARTData(t *testing.T) {
 		t.Fatalf("expected valid fallback SMART data: %+v", got)
 	}
 }
-
-func TestHasMissingSMARTTreatsInvalidATAChecksumAsRecoverable(t *testing.T) {
-	if !hasMissingSMART([]smart.Disk{{Kind: smart.KindATA, Attrs: []smart.Attr{{ID: 1}}, SMARTChecksumKnown: true, SMARTChecksumValid: false}}) {
-		t.Fatal("invalid ATA SMART checksum should trigger fallback")
-	}
-	if hasMissingSMART([]smart.Disk{{Kind: smart.KindATA, Attrs: []smart.Attr{{ID: 1}}, SMARTChecksumKnown: true, SMARTChecksumValid: true}}) {
-		t.Fatal("valid ATA SMART data should not trigger fallback")
-	}
-}

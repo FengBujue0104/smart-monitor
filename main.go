@@ -47,9 +47,9 @@ func main() {
 			walk.MsgBox(nil, "扫描失败", fmt.Sprintf("枚举磁盘失败: %v", err), walk.MsgBoxIconError)
 			os.Exit(2)
 		}
-	} else if hasMissingSMART(disks) {
-		// IOCTL 可能只对部分控制器成功；按 PhysicalDrive 编号用 WMI 补齐缺失盘，
-		// 不覆盖已经成功读取的属性。
+	} else {
+		// IOCTL 可能无法打开 RAID、USB 桥接或权限受限的某一块物理盘。始终
+		// 合并 WMI 的枚举结果，既补齐缺失属性，也补回主路径完全未发现的磁盘。
 		if fallback, wmiErr := smart.DiscoverWMI(); wmiErr == nil {
 			disks = mergeFallbackDisks(disks, fallback)
 		}
@@ -64,18 +64,6 @@ func main() {
 		log.Printf("UI error: %v", err)
 		os.Exit(3)
 	}
-}
-
-func hasMissingSMART(disks []smart.Disk) bool {
-	for _, d := range disks {
-		if len(d.Attrs) == 0 {
-			return true
-		}
-		if d.Kind == smart.KindATA && d.SMARTChecksumKnown && !d.SMARTChecksumValid {
-			return true
-		}
-	}
-	return false
 }
 
 func mergeFallbackDisks(primary, fallback []smart.Disk) []smart.Disk {
