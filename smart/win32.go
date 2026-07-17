@@ -1,0 +1,72 @@
+package smart
+
+import (
+	"syscall"
+	"unsafe"
+
+	"golang.org/x/sys/windows"
+)
+
+// IOCTL 控制码 —— 经 CTL_CODE 宏核算验证（见仓库 build 目录 ctlcalc.go 辅助计算脚本）。
+// CTL_CODE(dev, func, method, access) = (dev<<16) | (access<<14) | (func<<2) | method
+// dev=4 (IOCTL_SCSI_BASE), access=3 (FILE_READ|FILE_WRITE), method=0 (METHOD_BUFFERED)
+// => dev<<16 = 0x40000，access<<14 = 0xC000，即前缀 0x4C000，再加上 (func<<2)。
+const (
+	// ATA passthrough（已验证值）
+	IOCTL_ATA_PASS_THROUGH    = 0x4D02C // func 0x040b
+	IOCTL_ATA_PASS_THROUGH_EX = 0x4D030 // func 0x040c
+
+	// SMART 数据命令（ntdddisk.h，与 IOCTL_ATA_PASS_THROUGH_EX 同值或通过该 IOCTL + IRB 传递）
+	SMART_RCV_DRIVE_DATA  = 0x4D030
+	SMART_SEND_DRIVE_DATA = 0x4D034
+
+	// SCSI Miniport
+	IOCTL_SCSI_MINIPORT = 0x4D008
+
+	// 存储属性查询（DeviceIOControl 官方值）
+	IOCTL_STORAGE_QUERY_PROPERTY = 0x002D1400
+
+	// NVMe Get Log Page（Win8.1+/Win10+ 稳定）
+	IOCTL_STORAGE_PROTOCOL_COMMAND = 0x002D9808
+)
+
+// ATA 命令与 SMART 子命令已移至 ata.go，避免重定义。
+
+// ===== 通用辅助 =====
+
+func toUTF16Ptr(s string) *uint16 {
+	p, _ := windows.UTF16PtrFromString(s)
+	return p
+}
+
+// readCStrings 以「偏移 N 处读取 UTF-16LE（偏移在头中给出）序列」的方式处理 Windows 存储描述符中的字符串字段。
+// 对于 STORAGE_DEVICE_DESCRIPTOR，字符串偏移在 SerialNumberOffset / ProductIdOffset / ProductRevisionOffset。
+// 这里给出一个安全的小工具：读取最大 max 字节的 NUL 结尾 UTF-16。
+func readUTF16(b []byte) string {
+	if len(b) == 0 || len(b)%2 != 0 {
+		return ""
+	}
+	u16 := unsafe.Slice((*uint16)(unsafe.Pointer(&b[0])), len(b)/2)
+	n := 0
+	for n < len(u16) && u16[n] != 0 {
+		n++
+	}
+	return syscall.UTF16ToString(u16[:n])
+}
+
+// openDevice 以读写+共享方式打开 \\.\PhysicalDriveN
+func openDevice(path string) (windows.Handle, error) {
+	p, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return 0, err
+	}
+	return windows.CreateFile(
+		p,
+		windows.GENERIC_READ|windows.GENERIC_WRITE,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE,
+		nil,
+		windows.OPEN_EXISTING,
+		0,
+		0,
+	)
+}

@@ -1,0 +1,71 @@
+package main
+
+import (
+	"fmt"
+	"log"
+	"os"
+	"runtime"
+
+	"github.com/lxn/walk"
+	"golang.org/x/sys/windows"
+	"smonitor/health"
+	"smonitor/smart"
+	"smonitor/ui"
+)
+
+func main() {
+	// 主线程必须锁定（Win32 GUI 要求），并初始化 COM（STA）以避免 ToolTip TTM_ADDTOOL 失败。
+	runtime.LockOSThread()
+	// STA：多线程公寓对 ToolTip/CommonDialog 更稳定
+	_ = windows.CoInitializeEx(0, windows.COINIT_APARTMENTTHREADED|windows.COINIT_DISABLE_OLE1DDE)
+	defer windows.CoUninitialize()
+
+	// 设置 walk 应用元数据（影响注册表/设置存储路径，也触发内部初始化）
+	walk.App().SetOrganizationName("smonitor")
+	walk.App().SetProductName("S.M.A.R.T 健康检查工具")
+
+	// 检查管理员权限（SMART IOCTL 必需）
+	if !isAdmin() {
+		walk.MsgBox(nil, "需要管理员权限",
+			"本工具需要管理员权限才能读取硬盘 S.M.A.R.T 数据。\n请右键 → 以管理员身份运行。",
+			walk.MsgBoxIconWarning)
+		os.Exit(1)
+	}
+
+	logFile, err := os.OpenFile("smonitor.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err == nil {
+		defer logFile.Close()
+		log.SetOutput(logFile)
+	}
+
+	// 优先使用 IOCTL：它能区分 ATA/NVMe，并按 PhysicalDrive 建立一对一关联。
+	// WMI 仅作为控制器不支持 IOCTL 时的兼容回退。
+	disks, err := smart.Discover()
+	if err != nil || len(disks) == 0 {
+		disks, err = smart.DiscoverWMI()
+		if err != nil {
+			walk.MsgBox(nil, "扫描失败", fmt.Sprintf("枚举磁盘失败: %v", err), walk.MsgBoxIconError)
+			os.Exit(2)
+		}
+	}
+	if len(disks) == 0 {
+		walk.MsgBox(nil, "未发现磁盘", "未找到任何物理磁盘。", walk.MsgBoxIconInformation)
+		os.Exit(0)
+	}
+
+	violations := health.Evaluate(disks)
+	if err := ui.RunReport(disks, violations); err != nil {
+		log.Printf("UI error: %v", err)
+		os.Exit(3)
+	}
+}
+
+// isAdmin 简单检测：尝试打开 \\.\PhysicalDrive0；失败则视为无权限。
+func isAdmin() bool {
+	h, err := smart.OpenDeviceForTest(`\\.\PhysicalDrive0`)
+	if err != nil {
+		return false
+	}
+	h.Close()
+	return true
+}

@@ -1,0 +1,24 @@
+# 构建产物
+smonitor.exe
+rsrc.syso
+
+# 日志 / 截图
+*.log
+screenshot*.png
+final.png
+
+# 临时测试工具
+/tmp/
+cmd/smoke/
+cmd/clickcopy/
+
+# Go
+vendor/
+*.test
+*.out
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
