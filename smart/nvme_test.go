@@ -33,11 +33,13 @@ func TestParseNVMeHealthLog(t *testing.T) {
 	data[3] = 95
 	data[4] = 10
 	data[5] = 7
-	binary.LittleEndian.PutUint64(data[0x30:0x38], 12)
-	binary.LittleEndian.PutUint64(data[0x38:0x40], 34)
-	binary.LittleEndian.PutUint64(data[0x48:0x50], 2)
-	binary.LittleEndian.PutUint32(data[0x58:0x5C], 9)
-	binary.LittleEndian.PutUint16(data[0x60:0x62], 310)
+	binary.LittleEndian.PutUint64(data[0x20:0x28], 1000000)
+	binary.LittleEndian.PutUint64(data[0x28:0x30], 1)
+	binary.LittleEndian.PutUint64(data[0x70:0x78], 12)
+	binary.LittleEndian.PutUint64(data[0x80:0x88], 34)
+	binary.LittleEndian.PutUint64(data[0xA0:0xA8], 2)
+	binary.LittleEndian.PutUint32(data[0xC0:0xC4], 9)
+	binary.LittleEndian.PutUint16(data[0xC8:0xCA], 310)
 
 	attrs := parseNVMeHealthLog(data)
 	values := map[int]uint64{}
@@ -48,6 +50,11 @@ func TestParseNVMeHealthLog(t *testing.T) {
 		values[NVMePowerOnHours] != 34 || values[NVMeMediaErrors] != 2 ||
 		values[NVMeWarningTempTime] != 9 || values[NVMeReadOnly] != 1 {
 		t.Fatalf("unexpected NVMe attributes: %+v", values)
+	}
+	for _, a := range attrs {
+		if a.ID == NVMeDataUnitsRead && (a.Raw != 1000000 || a.RawHigh != 1) {
+			t.Fatalf("unexpected 128-bit data units: %+v", a)
+		}
 	}
 }
 

@@ -12,13 +12,14 @@ const (
 
 // Attr 是统一后的 SMART 属性（ATA 与 NVMe 共用）
 type Attr struct {
-	ID     int    // ATA 属性 ID（NVMe 字段用伪 ID，见下方 NVMe* 常量）
-	Name   string // 属性名
-	Raw    uint64 // 原始值（已解码为可用数值）
-	Value  int    // 归一化当前值（ATA: 1-253；NVMe 不使用）
-	Worst  int    // 归一化历史最差值（ATA）
-	Thresh int    // 阈值（ATA）
-	Kind   string // "ata" / "nvme"
+	ID      int    // ATA 属性 ID（NVMe 字段用伪 ID，见下方 NVMe* 常量）
+	Name    string // 属性名
+	Raw     uint64 // 原始值（已解码为可用数值）
+	RawHigh uint64 // 128 位 NVMe 计数的高 64 位，ATA/普通字段为 0
+	Value   int    // 归一化当前值（ATA: 1-253；NVMe 不使用）
+	Worst   int    // 归一化历史最差值（ATA）
+	Thresh  int    // 阈值（ATA）
+	Kind    string // "ata" / "nvme"
 }
 
 // NVMe 字段伪 ID（用于 Attr.ID，避免与 ATA 冲突）

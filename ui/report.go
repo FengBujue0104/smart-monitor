@@ -226,7 +226,11 @@ func attrRawStr(a smart.Attr) string {
 		case smart.NVMeAvailableSpare, smart.NVMeAvailSpareThresh, smart.NVMePercentUsed:
 			return fmt.Sprintf("%d%%", a.Raw)
 		case smart.NVMeDataUnitsRead, smart.NVMeDataUnitsWritten:
-			return fmt.Sprintf("%.2f TB (%d units)", float64(a.Raw)*512000.0/1e12, a.Raw)
+			units := float64(a.Raw) + float64(a.RawHigh)*18446744073709551616.0
+			if a.RawHigh == 0 {
+				return fmt.Sprintf("%.2f TB (%d units)", units*512000.0/1e12, a.Raw)
+			}
+			return fmt.Sprintf("%.2f TB (0x%016X%016X units)", units*512000.0/1e12, a.RawHigh, a.Raw)
 		case smart.NVMePowerOnHours:
 			return fmt.Sprintf("%d h", a.Raw)
 		case smart.NVMeWarningTempTime, smart.NVMeCriticalTempTime:

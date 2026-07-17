@@ -103,21 +103,21 @@ func parseNVMeProtocolStatus(buf []byte) error {
 //	0x04    1     AvailableSpareThreshold（%）
 //	0x05    1     PercentageUsed（%）
 //	0x06    1     EnduranceGroupCriticalWarningSummary
-//	0x08    8     DataUnitsRead（1000 * 512B 单位）
-//	0x10    8     DataUnitsWritten
-//	0x18    8     HostReadCommands
-//	0x20    8     HostWriteCommands
-//	0x28    8     ControllerBusyTime（分钟）
-//	0x30    8     PowerCycles
-//	0x38    8     PowerOnHours
-//	0x40    8     UnsafeShutdowns
-//	0x48    8     MediaErrors（= 用户说的 0E "介质与数据完整性错误计数"）
-//	0x50    8     NumErrorInfoLogEntries
-//	0x58    4     WarningCompTempTime（分钟）
-//	0x5C    4     CriticalCompTempTime（分钟）
-//	0x60..  8*8   SensorTemperature[8]（开尔文）
+//	0x20    16    DataUnitsRead（1000 * 512B 单位）
+//	0x30    16    DataUnitsWritten
+//	0x40    16    HostReadCommands
+//	0x50    16    HostWriteCommands
+//	0x60    16    ControllerBusyTime（分钟）
+//	0x70    16    PowerCycles
+//	0x80    16    PowerOnHours
+//	0x90    16    UnsafeShutdowns
+//	0xA0    16    MediaErrors（介质与数据完整性错误计数）
+//	0xB0    16    NumErrorInfoLogEntries
+//	0xC0    4     WarningCompTempTime（分钟）
+//	0xC4    4     CriticalCompTempTime（分钟）
+//	0xC8    8*2   SensorTemperature[8]（开尔文）
 func parseNVMeHealthLog(data []byte) []Attr {
-	if len(data) < 0x60 {
+	if len(data) < 0xCA {
 		return nil
 	}
 	var attrs []Attr
@@ -127,32 +127,32 @@ func parseNVMeHealthLog(data []byte) []Attr {
 	spare := data[0x03]
 	spareThresh := data[0x04]
 	pctUsed := data[0x05]
-	mediaErrors := binary.LittleEndian.Uint64(data[0x48:0x50])
-	dataUnitsRead := binary.LittleEndian.Uint64(data[0x08:0x10])
-	dataUnitsWritten := binary.LittleEndian.Uint64(data[0x10:0x18])
-	powerCycles := binary.LittleEndian.Uint64(data[0x30:0x38])
-	powerOnHours := binary.LittleEndian.Uint64(data[0x38:0x40])
-	unsafeShutdowns := binary.LittleEndian.Uint64(data[0x40:0x48])
-	errorInfoEntries := binary.LittleEndian.Uint64(data[0x50:0x58])
-	warningTempTime := uint64(binary.LittleEndian.Uint32(data[0x58:0x5C]))
-	criticalTempTime := uint64(binary.LittleEndian.Uint32(data[0x5C:0x60]))
+	dataUnitsRead, dataUnitsReadHigh := readNVMeUint128(data, 0x20)
+	dataUnitsWritten, dataUnitsWrittenHigh := readNVMeUint128(data, 0x30)
+	powerCycles, powerCyclesHigh := readNVMeUint128(data, 0x70)
+	powerOnHours, powerOnHoursHigh := readNVMeUint128(data, 0x80)
+	unsafeShutdowns, unsafeShutdownsHigh := readNVMeUint128(data, 0x90)
+	mediaErrors, mediaErrorsHigh := readNVMeUint128(data, 0xA0)
+	errorInfoEntries, errorInfoEntriesHigh := readNVMeUint128(data, 0xB0)
+	warningTempTime := uint64(binary.LittleEndian.Uint32(data[0xC0:0xC4]))
+	criticalTempTime := uint64(binary.LittleEndian.Uint32(data[0xC4:0xC8]))
 
 	attrs = append(attrs, Attr{ID: NVMeCriticalWarning, Name: "Critical_Warning", Raw: uint64(cw), Kind: "nvme"})
 	attrs = append(attrs, Attr{ID: NVMeTemperature, Name: "Temperature_Kelvin", Raw: uint64(tempK), Kind: "nvme"})
 	attrs = append(attrs, Attr{ID: NVMeAvailableSpare, Name: "Available_Spare_Pct", Raw: uint64(spare), Kind: "nvme"})
 	attrs = append(attrs, Attr{ID: NVMeAvailSpareThresh, Name: "Available_Spare_Threshold", Raw: uint64(spareThresh), Kind: "nvme"})
 	attrs = append(attrs, Attr{ID: NVMePercentUsed, Name: "Percentage_Used", Raw: uint64(pctUsed), Kind: "nvme"})
-	attrs = append(attrs, Attr{ID: NVMeMediaErrors, Name: "Media_Data_Integrity_Errors", Raw: mediaErrors, Kind: "nvme"})
-	attrs = append(attrs, Attr{ID: NVMeDataUnitsRead, Name: "Data_Units_Read", Raw: dataUnitsRead, Kind: "nvme"})
-	attrs = append(attrs, Attr{ID: NVMeDataUnitsWritten, Name: "Data_Units_Written", Raw: dataUnitsWritten, Kind: "nvme"})
-	attrs = append(attrs, Attr{ID: NVMePowerCycles, Name: "Power_Cycles", Raw: powerCycles, Kind: "nvme"})
-	attrs = append(attrs, Attr{ID: NVMePowerOnHours, Name: "Power_On_Hours", Raw: powerOnHours, Kind: "nvme"})
-	attrs = append(attrs, Attr{ID: NVMeUnsafeShutdowns, Name: "Unsafe_Shutdowns", Raw: unsafeShutdowns, Kind: "nvme"})
-	attrs = append(attrs, Attr{ID: NVMeErrorInfoEntries, Name: "Error_Info_Log_Entries", Raw: errorInfoEntries, Kind: "nvme"})
+	attrs = append(attrs, Attr{ID: NVMeMediaErrors, Name: "Media_Data_Integrity_Errors", Raw: mediaErrors, RawHigh: mediaErrorsHigh, Kind: "nvme"})
+	attrs = append(attrs, Attr{ID: NVMeDataUnitsRead, Name: "Data_Units_Read", Raw: dataUnitsRead, RawHigh: dataUnitsReadHigh, Kind: "nvme"})
+	attrs = append(attrs, Attr{ID: NVMeDataUnitsWritten, Name: "Data_Units_Written", Raw: dataUnitsWritten, RawHigh: dataUnitsWrittenHigh, Kind: "nvme"})
+	attrs = append(attrs, Attr{ID: NVMePowerCycles, Name: "Power_Cycles", Raw: powerCycles, RawHigh: powerCyclesHigh, Kind: "nvme"})
+	attrs = append(attrs, Attr{ID: NVMePowerOnHours, Name: "Power_On_Hours", Raw: powerOnHours, RawHigh: powerOnHoursHigh, Kind: "nvme"})
+	attrs = append(attrs, Attr{ID: NVMeUnsafeShutdowns, Name: "Unsafe_Shutdowns", Raw: unsafeShutdowns, RawHigh: unsafeShutdownsHigh, Kind: "nvme"})
+	attrs = append(attrs, Attr{ID: NVMeErrorInfoEntries, Name: "Error_Info_Log_Entries", Raw: errorInfoEntries, RawHigh: errorInfoEntriesHigh, Kind: "nvme"})
 	attrs = append(attrs, Attr{ID: NVMeWarningTempTime, Name: "Warning_Temperature_Time", Raw: warningTempTime, Kind: "nvme"})
 	attrs = append(attrs, Attr{ID: NVMeCriticalTempTime, Name: "Critical_Temperature_Time", Raw: criticalTempTime, Kind: "nvme"})
 	for i := 0; i < 8; i++ {
-		off := 0x60 + i*2
+		off := 0xC8 + i*2
 		temp := binary.LittleEndian.Uint16(data[off : off+2])
 		if temp == 0 {
 			continue
@@ -169,6 +169,10 @@ func parseNVMeHealthLog(data []byte) []Attr {
 		attrs = append(attrs, Attr{ID: NVMeReadOnly, Name: "Read_Only_Mode", Raw: 1, Kind: "nvme"})
 	}
 	return attrs
+}
+
+func readNVMeUint128(data []byte, off int) (low, high uint64) {
+	return binary.LittleEndian.Uint64(data[off : off+8]), binary.LittleEndian.Uint64(data[off+8 : off+16])
 }
 
 // ReadNVMeHealth 读取 NVMe 健康日志并返回统一 Attr 列表。
