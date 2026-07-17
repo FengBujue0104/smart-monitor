@@ -82,3 +82,17 @@ func TestSMARTChecksumValid(t *testing.T) {
 		t.Fatal("expected invalid SMART checksum")
 	}
 }
+
+func TestParseSMARTThresholdsSupportsHeaderlessResponse(t *testing.T) {
+	data := make([]byte, 512)
+	data[0] = 0x05
+	data[1] = 36
+	off := 12
+	data[off] = 0xC5
+	data[off+1] = 18
+
+	thresholds := parseSMARTThresholds(data)
+	if thresholds[0x05] != 36 || thresholds[0xC5] != 18 {
+		t.Fatalf("unexpected headerless thresholds: %+v", thresholds)
+	}
+}

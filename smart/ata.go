@@ -317,9 +317,14 @@ func ReadSMARTThresholds(h windows.Handle, driveNum byte) (map[int]int, error) {
 	if err != nil {
 		return nil, err
 	}
+	return parseSMARTThresholds(data), nil
+}
+
+func parseSMARTThresholds(data []byte) map[int]int {
 	m := map[int]int{}
+	base := smartTableBase(data)
 	for i := 0; i < 30; i++ {
-		off := 2 + i*12
+		off := base + i*12
 		if off+12 > len(data) {
 			break
 		}
@@ -330,7 +335,7 @@ func ReadSMARTThresholds(h windows.Handle, driveNum byte) (map[int]int, error) {
 		thresh := int(data[off+1])
 		m[id] = thresh
 	}
-	return m, nil
+	return m
 }
 
 // swapUTF16Bytes 对每 2 字节做 byte-swap（ATA IDENTIFY 双字节反序）
