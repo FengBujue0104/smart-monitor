@@ -34,33 +34,40 @@ func WriteText(s string) error {
 
 	ret, _, err := open.Call(0)
 	if ret == 0 {
-		return err
+		return clipboardCallError(err)
 	}
 	defer close.Call(0)
 
-	if r, _, _ := empty.Call(0); r == 0 {
-		return syscall.EINVAL
+	if r, _, callErr := empty.Call(0); r == 0 {
+		return clipboardCallError(callErr)
 	}
 
 	size := uintptr(len(p) * 2)
 	h, _, err := galloc.Call(GMEM_MOVEABLE, size)
 	if h == 0 {
-		return err
+		return clipboardCallError(err)
 	}
-	lp, _, _ := gloc.Call(h)
+	lp, _, lockErr := gloc.Call(h)
 	if lp == 0 {
 		gfree.Call(h)
-		return syscall.EINVAL
+		return clipboardCallError(lockErr)
 	}
 	// 通过 Win32 内存复制函数写入 GlobalLock 返回的地址，避免把外部地址伪装成 Go slice。
 	moveMemory := kernel32.NewProc("RtlMoveMemory")
 	moveMemory.Call(lp, uintptr(unsafe.Pointer(&p[0])), size)
 	gunloc.Call(h)
-	r, _, _ := set.Call(CF_UNICODETEXT, h)
+	r, _, setErr := set.Call(CF_UNICODETEXT, h)
 	if r == 0 {
 		gfree.Call(h)
-		return syscall.EINVAL
+		return clipboardCallError(setErr)
 	}
 	// SetClipboardData 后系统拥有 h，不要再次 GlobalFree
 	return nil
+}
+
+func clipboardCallError(err error) error {
+	if err == nil || err == syscall.Errno(0) {
+		return syscall.EINVAL
+	}
+	return err
 }
