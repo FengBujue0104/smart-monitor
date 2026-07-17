@@ -158,8 +158,26 @@ func evaluateATA(d smart.Disk) []Violation {
 				add(a, Warning, its(a.Value), "≥ "+its(a.Thresh))
 			}
 		}
+		if shouldApplyGenericATAThreshold(a) && a.Thresh > 0 && a.Value > 0 && a.Value <= a.Thresh {
+			severity := Warning
+			if a.Flags&0x0001 != 0 { // ATA SMART 属性标志 bit 0：pre-fail
+				severity = Critical
+			}
+			add(a, severity, its(a.Value), "> "+its(a.Thresh))
+		}
 	}
 	return vs
+}
+
+// shouldApplyGenericATAThreshold keeps per-attribute rules authoritative
+// while still reporting vendor-specific attributes that have reached their
+// device-provided normalized-value threshold.
+func shouldApplyGenericATAThreshold(a smart.Attr) bool {
+	switch a.ID {
+	case 0x01, 0x05, 0xBB, 0xBC, 0xC2, 0xC5, 0xC6, 0xE8, 0xE9, 0xAD, 0xB1:
+		return false
+	}
+	return true
 }
 
 func evaluateNVMe(d smart.Disk) []Violation {

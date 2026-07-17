@@ -57,6 +57,38 @@ func TestInvalidATASMARTChecksumCreatesWarning(t *testing.T) {
 	}
 }
 
+func TestGenericATAThresholdUsesPreFailSeverity(t *testing.T) {
+	tests := []struct {
+		name  string
+		flags uint16
+		want  Severity
+	}{
+		{name: "pre-fail", flags: 0x0001, want: Critical},
+		{name: "old-age", flags: 0x0002, want: Warning},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := smart.Disk{Index: 0, Kind: smart.KindATA, Attrs: []smart.Attr{{
+				ID: 0xAA, Name: "Vendor_Health_Metric", Flags: tt.flags, Value: 10, Thresh: 10,
+			}}}
+			got := Evaluate([]smart.Disk{d})
+			if len(got) != 1 || got[0].Severity != tt.want || got[0].Current != "10" || got[0].Limit != "> 10" {
+				t.Fatalf("unexpected generic threshold violation: %+v", got)
+			}
+		})
+	}
+}
+
+func TestDedicatedATAThresholdDoesNotCreateDuplicateGenericViolation(t *testing.T) {
+	d := smart.Disk{Index: 0, Kind: smart.KindATA, Attrs: []smart.Attr{{
+		ID: 0x01, Flags: 0x0001, Value: 10, Thresh: 10,
+	}}}
+	got := Evaluate([]smart.Disk{d})
+	if len(got) != 1 || got[0].Severity != Warning {
+		t.Fatalf("expected only dedicated read-error warning: %+v", got)
+	}
+}
+
 func TestNVMePercentageUsedIsNotFailureAtFiftyPercent(t *testing.T) {
 	for _, value := range []uint64{50, 79} {
 		d := smart.Disk{Index: 0, Kind: smart.KindNVMe, Attrs: []smart.Attr{{
