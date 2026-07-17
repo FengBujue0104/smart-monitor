@@ -58,7 +58,11 @@ func buildTextReport(disks []smart.Disk, vs []health.Violation) string {
 				mark, v.DiskIndex, v.AttrName, v.Current, v.Limit))
 		}
 	} else {
-		b.WriteString("结论: 所有监测指标在安全范围内。\n")
+		if unread := unreadSMARTCount(disks); unread > 0 {
+			b.WriteString(fmt.Sprintf("结论: %d 块磁盘未读取到 SMART 数据，无法得出完整健康结论。\n", unread))
+		} else {
+			b.WriteString("结论: 所有监测指标在安全范围内。\n")
+		}
 	}
 	b.WriteString("============================\n")
 	return b.String()

@@ -54,3 +54,23 @@ func TestDiskSummaryShowsChecksumWarning(t *testing.T) {
 		t.Fatalf("unexpected checksum summary: %q", got)
 	}
 }
+
+func TestReportModelShowsDiskWhenSMARTDataIsUnavailable(t *testing.T) {
+	m := &reportModel{disks: []smart.Disk{{Index: 4, Kind: smart.KindATA, Model: "Unavailable"}}}
+	if got := m.RowCount(); got != 1 {
+		t.Fatalf("row count = %d, want 1", got)
+	}
+	if got := m.Value(0, 2); got != "-" {
+		t.Fatalf("unavailable SMART ID = %q, want -", got)
+	}
+	if got := m.Value(0, 4); got != "SMART 数据未读取" {
+		t.Fatalf("unavailable SMART row name = %q", got)
+	}
+}
+
+func TestTextReportDoesNotClaimHealthyWhenSMARTIsUnavailable(t *testing.T) {
+	report := buildTextReport([]smart.Disk{{Index: 1, Kind: smart.KindATA, Model: "Unavailable"}}, nil)
+	if !strings.Contains(report, "无法得出完整健康结论") || strings.Contains(report, "所有监测指标在安全范围内") {
+		t.Fatalf("unexpected text report conclusion: %q", report)
+	}
+}

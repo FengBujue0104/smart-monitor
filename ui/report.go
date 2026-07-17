@@ -32,7 +32,7 @@ func RunReport(disks []smart.Disk, violations []health.Violation) error {
 		Size:     Size{Width: 1000, Height: 640},
 		Layout:   VBox{Margins: Margins{Left: 8, Top: 8, Right: 8, Bottom: 8}},
 		Children: []Widget{
-			alertBanner(violations),
+			alertBanner(disks, violations),
 			Label{
 				Text:      fmt.Sprintf("检测时间: %s | 主机: %s", time.Now().Format("2006-01-02 15:04:05"), hostName()),
 				Font:      Font{Family: "微软雅黑", PointSize: 10},
@@ -132,6 +132,22 @@ func (m *reportModel) build() {
 	}
 	for _, d := range m.disks {
 		dname := fmt.Sprintf("PhysicalDrive%d  %s", d.Index, diskSummary(d))
+		if len(d.Attrs) == 0 {
+			m.rows = append(m.rows, reportRow{
+				disk:     dname,
+				kind:     string(d.Kind),
+				id:       -1,
+				flags:    "-",
+				name:     "SMART 数据未读取",
+				raw:      "-",
+				current:  "-",
+				worst:    "-",
+				limit:    "-",
+				status:   "❔ 未读取",
+				severity: "unknown",
+			})
+			continue
+		}
 		for _, a := range d.Attrs {
 			k := [2]int{d.Index, a.ID}
 			sev := vmap[k]
@@ -185,6 +201,9 @@ func (m *reportModel) Value(row, col int) interface{} {
 	case 1:
 		return r.kind
 	case 2:
+		if r.id < 0 {
+			return "-"
+		}
 		return fmt.Sprintf("0x%02X", r.id)
 	case 3:
 		return r.flags
@@ -217,6 +236,9 @@ func (m *reportModel) StyleCell(c *walk.CellStyle) {
 	case "warning":
 		c.BackgroundColor = walk.RGB(0xEE, 0xD0, 0x80)
 		c.TextColor = walk.RGB(0xB0, 0x60, 0x00)
+	case "unknown":
+		c.BackgroundColor = walk.RGB(0xE8, 0xE8, 0xE8)
+		c.TextColor = walk.RGB(0x55, 0x55, 0x55)
 	default:
 		c.BackgroundColor = walk.RGB(0xEE, 0xF7, 0xEE)
 		c.TextColor = walk.RGB(0x22, 0x66, 0x22)
@@ -336,8 +358,25 @@ func threshStr(t int) string {
 
 // ===== 告警条 =====
 
-func alertBanner(vs []health.Violation) Widget {
+func unreadSMARTCount(disks []smart.Disk) int {
+	count := 0
+	for _, d := range disks {
+		if len(d.Attrs) == 0 {
+			count++
+		}
+	}
+	return count
+}
+
+func alertBanner(disks []smart.Disk, vs []health.Violation) Widget {
 	if len(vs) == 0 {
+		if unread := unreadSMARTCount(disks); unread > 0 {
+			return Label{
+				Text:      fmt.Sprintf("⚠️ %d 块磁盘未读取到 SMART 数据，无法得出完整健康结论", unread),
+				Font:      Font{Family: "微软雅黑", PointSize: 11},
+				TextColor: walk.RGB(0xB0, 0x60, 0x00),
+			}
+		}
 		return Label{
 			Text:      "✅ 所有监测的 SMART 指标均处于安全范围",
 			Font:      Font{Family: "微软雅黑", PointSize: 11},
@@ -352,6 +391,9 @@ func alertBanner(vs []health.Violation) Widget {
 		}
 		lines = append(lines, fmt.Sprintf("  %s [Disk%d] %s: %s (阈值 %s)",
 			mark, v.DiskIndex, v.AttrName, v.Current, v.Limit))
+	}
+	if unread := unreadSMARTCount(disks); unread > 0 {
+		lines = append(lines, fmt.Sprintf("  ⚠️ %d 块磁盘未读取到 SMART 数据", unread))
 	}
 	return TextEdit{
 		ReadOnly:   true,
