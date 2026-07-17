@@ -259,7 +259,23 @@ func diskSummary(d smart.Disk) string {
 	if len(d.Attrs) == 0 {
 		return summary + " [SMART未读取]"
 	}
+	if d.SmartStatusKnown {
+		if d.SmartStatusPassed {
+			return summary + " [SMART通过]"
+		}
+		return summary + " [SMART失败]"
+	}
 	return summary + " [SMART数据已读取]"
+}
+
+func smartStatusText(d smart.Disk) string {
+	if !d.SmartStatusKnown {
+		return "未知"
+	}
+	if d.SmartStatusPassed {
+		return "通过"
+	}
+	return "失败"
 }
 
 func attrCurrentStr(a smart.Attr) string {

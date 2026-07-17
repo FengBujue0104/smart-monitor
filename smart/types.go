@@ -51,7 +51,8 @@ type Disk struct {
 	SizeGB   float64
 	Attrs    []Attr
 	// ATA 特有
-	SmartStatusPassed bool // ATA SMART 数据读取是否成功（不是 overall health）
+	SmartStatusKnown  bool // 是否成功读取 ATA SMART overall status
+	SmartStatusPassed bool // ATA SMART overall status 是否通过
 	// NVMe 特有
 	NVMeCriticalSpareBelow bool
 	NVMeReadOnlyMode       bool

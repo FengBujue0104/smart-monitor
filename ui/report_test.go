@@ -37,3 +37,10 @@ func TestDiskSummaryIncludesCapacityAndReadState(t *testing.T) {
 		t.Fatalf("unexpected disk summary: %q", got)
 	}
 }
+
+func TestDiskSummaryShowsOverallSMARTStatusWhenKnown(t *testing.T) {
+	d := smart.Disk{Model: "Test HDD", SmartStatusKnown: true, SmartStatusPassed: false, Attrs: []smart.Attr{{ID: 1}}}
+	if got := diskSummary(d); !strings.Contains(got, "SMART失败") || smartStatusText(d) != "失败" {
+		t.Fatalf("unexpected failed SMART summary: %q", got)
+	}
+}

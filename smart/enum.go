@@ -189,11 +189,17 @@ func Discover() ([]Disk, error) {
 					d.Firmware = fw
 				}
 			}
-			attrs, ok, smErr := ReadSMARTData(h, byte(i))
+			attrs, _, smErr := ReadSMARTData(h, byte(i))
+			status, statusErr := ReadSMARTOverallStatus(h)
+			if statusErr == nil {
+				d.SmartStatusKnown = true
+				d.SmartStatusPassed = status
+			} else {
+				fmt.Printf("[disk%d] SMART_STATUS_ERR: %v\n", i, statusErr)
+			}
 			if smErr != nil {
 				fmt.Printf("[disk%d] SMART_DATA_ERR: %v\n", i, smErr)
 			} else {
-				d.SmartStatusPassed = ok
 				th, thErr := ReadSMARTThresholds(h, byte(i))
 				if thErr == nil {
 					for i := range attrs {

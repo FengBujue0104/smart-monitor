@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"runtime"
 
 	"golang.org/x/sys/windows"
 )
@@ -17,6 +18,7 @@ const (
 const (
 	SMART_READ_DATA       = 0xD0
 	SMART_READ_THRESHOLDS = 0xD1
+	SMART_RETURN_STATUS   = 0xDA
 )
 
 // ===== SMART_RCV_DRIVE_DATA / SEND_DRIVE_DATA（ntdddisk.h）=====
@@ -87,6 +89,54 @@ func buildSmartCmd(cmd, sub, driveNum byte, buf []byte) []byte {
 	// 拷贝数据缓冲区
 	copy(raw[sendCmdParamsSize:], buf)
 	return raw
+}
+
+// buildSMARTReturnStatus builds an ATA_PASS_THROUGH_EX request without a data buffer.
+func buildSMARTReturnStatus() []byte {
+	headerSize, taskFileOffset := 48, 40 // x64 layout
+	if runtime.GOARCH == "386" {
+		headerSize, taskFileOffset = 40, 32
+	}
+	buf := make([]byte, headerSize)
+	binary.LittleEndian.PutUint16(buf[0:2], uint16(headerSize))
+	binary.LittleEndian.PutUint16(buf[2:4], 0x0001) // ATA_FLAGS_DRDY_REQUIRED
+	binary.LittleEndian.PutUint32(buf[12:16], 10)   // TimeOutValue
+	// PreviousTaskFile is zero. CurrentTaskFile is the ATA task-file register set.
+	tf := buf[taskFileOffset:]
+	tf[0] = SMART_RETURN_STATUS // Features: SMART RETURN STATUS subcommand
+	tf[2] = 0x4F                // LBA low signature
+	tf[3] = 0xC2                // LBA mid signature
+	tf[5] = 0xA0                // Device
+	tf[6] = ATA_CMD_SMART
+	return buf
+}
+
+func parseSMARTReturnStatus(taskFile []byte) (bool, error) {
+	if len(taskFile) < 5 {
+		return false, fmt.Errorf("SMART RETURN STATUS task file too short")
+	}
+	// ATA specifies 0x4F/0xC2 for pass and 0xF4/0x2C when a threshold is exceeded.
+	if taskFile[3] == 0x4F && taskFile[4] == 0xC2 {
+		return true, nil
+	}
+	if taskFile[3] == 0xF4 && taskFile[4] == 0x2C {
+		return false, nil
+	}
+	return false, fmt.Errorf("unknown SMART RETURN STATUS signature: 0x%02X/0x%02X", taskFile[3], taskFile[4])
+}
+
+// ReadSMARTOverallStatus reads ATA SMART RETURN STATUS through ATA pass-through.
+func ReadSMARTOverallStatus(h windows.Handle) (bool, error) {
+	buf := buildSMARTReturnStatus()
+	var returned uint32
+	if err := windows.DeviceIoControl(h, IOCTL_ATA_PASS_THROUGH_EX,
+		&buf[0], uint32(len(buf)), &buf[0], uint32(len(buf)), &returned, nil); err != nil {
+		return false, fmt.Errorf("ATA SMART RETURN STATUS: %w", err)
+	}
+	if runtime.GOARCH == "386" {
+		return parseSMARTReturnStatus(buf[32:40])
+	}
+	return parseSMARTReturnStatus(buf[40:48])
 }
 
 // issueSmartCommand 通过 SMART_RCV_DRIVE_DATA 发命令并返回数据缓冲区。
