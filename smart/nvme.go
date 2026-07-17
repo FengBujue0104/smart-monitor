@@ -10,20 +10,8 @@ import (
 
 // ===== NVMe 结构体（NVMe Base Spec 1.4/2.0）=====
 
-// STORAGE_PROTOCOL_COMMAND 是 IOCTL_STORAGE_PROTOCOL_COMMAND 的输入/输出缓冲区。
-// 布局（MSDN）：
-//   Offset  Size  Field
-//   0x00    4     Length（结构长度）
-//   0x04    4     ProtocolSpecific（协议类型：NVMe = 0x01）
-//   0x08    4     TransferLength（数据缓冲区长度）
-//   0x0C    4     ExpectedTransferLength
-//   0x10    4     ProtocolSpecificData（NVMe: Get Log Page 的 DWORD0）
-//   0x14    2     ProtocolSpecificData2
-//   0x16    2     TimeoutValue（秒）
-//   0x18    4     dwReserved
-//   then: ReturnStatus(4) + ErrorInfoLength(4) + ErrorInfoBuffer + DataBuffer
-//
-// 为简化，我们使用「命令 + 数据缓冲区」拼接方式。
+// STORAGE_PROTOCOL_COMMAND 的固定部分为 56 字节，后面是 64 字节 NVMe 命令。
+// 数据缓冲区通过 DataFromDeviceBufferOffset 指定，不能简单按「头 + 数据」拼接。
 
 const (
 	STORAGE_PROTOCOL_TYPE_NVMe = 0x01
@@ -34,27 +22,38 @@ const (
 // buildNVMeGetLogPage 构造 Get Log Page 命令缓冲区。
 // 返回 [命令头][数据缓冲区] 拼接后的字节。
 func buildNVMeGetLogPage(logID uint8, lenBytes int) []byte {
-	// 命令头 40 字节（STORAGE_PROTOCOL_COMMAND 简化版）
-	hdr := make([]byte, 40)
-	binary.LittleEndian.PutUint32(hdr[0x00:0x04], uint32(40)) // Length
-	binary.LittleEndian.PutUint32(hdr[0x04:0x08], STORAGE_PROTOCOL_TYPE_NVMe)
-	binary.LittleEndian.PutUint32(hdr[0x08:0x0C], uint32(lenBytes)) // TransferLength
-	binary.LittleEndian.PutUint32(hdr[0x0C:0x10], uint32(lenBytes)) // ExpectedTransferLength
-	// ProtocolSpecificData: Get Log Page DWORD0 = (NUMDL << 16) | (LID << 8) | (LSP << 7) | RAE
-	// 简化：NUMDL = (lenBytes/4 - 1) 低 16 位，LID = logID
-	dw0 := (uint32(lenBytes/4-1) & 0xFFFF) << 16
-	dw0 |= uint32(logID) << 8
-	binary.LittleEndian.PutUint32(hdr[0x10:0x14], dw0)
-	// Timeout 10s
-	binary.LittleEndian.PutUint16(hdr[0x16:0x18], 10)
+	const (
+		protocolHeaderSize = 56
+		commandOffset      = 56
+		dataOffset         = 128
+		commandLength      = 64
+	)
+	if lenBytes <= 0 || lenBytes%4 != 0 {
+		return nil
+	}
+	buf := make([]byte, dataOffset+lenBytes)
+	// STORAGE_PROTOCOL_COMMAND
+	binary.LittleEndian.PutUint32(buf[0x00:0x04], 1) // Version
+	binary.LittleEndian.PutUint32(buf[0x04:0x08], protocolHeaderSize)
+	binary.LittleEndian.PutUint32(buf[0x08:0x0C], STORAGE_PROTOCOL_TYPE_NVMe)
+	binary.LittleEndian.PutUint32(buf[0x18:0x1C], commandLength)
+	binary.LittleEndian.PutUint32(buf[0x20:0x24], uint32(lenBytes)) // DataFromDeviceTransferLength
+	binary.LittleEndian.PutUint32(buf[0x24:0x28], dataOffset)       // DataFromDeviceBufferOffset
+	binary.LittleEndian.PutUint32(buf[0x30:0x34], 10)               // TimeoutValue
 
-	data := make([]byte, lenBytes)
-	return append(hdr, data...)
+	// NVMe Get Log Page command. CDW10 contains NUMDL and LID.
+	buf[commandOffset] = NVMeGetLogPage
+	cdw10 := (uint32(lenBytes/4-1) << 16) | uint32(logID)
+	binary.LittleEndian.PutUint32(buf[commandOffset+40:commandOffset+44], cdw10)
+	return buf
 }
 
 // issueNVMeGetLogPage 在已打开的 NVMe 设备上发 Get Log Page 并返回数据缓冲区。
 func issueNVMeGetLogPage(h windows.Handle, logID uint8) ([]byte, error) {
 	buf := buildNVMeGetLogPage(logID, 512)
+	if buf == nil {
+		return nil, fmt.Errorf("invalid NVMe log length")
+	}
 	outBuf := make([]byte, len(buf))
 	var bytesReturned uint32
 
@@ -71,34 +70,36 @@ func issueNVMeGetLogPage(h windows.Handle, logID uint8) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("IOCTL_STORAGE_PROTOCOL_COMMAND logID=0x%02X err=%w", logID, err)
 	}
-	if bytesReturned < uint32(40+512) {
+	const dataOffset = 128
+	if bytesReturned < uint32(dataOffset+512) {
 		return nil, fmt.Errorf("NVMe 返回过短: got=%d", bytesReturned)
 	}
-	return outBuf[40:], nil
+	return append([]byte(nil), outBuf[dataOffset:dataOffset+512]...), nil
 }
 
 // parseNVMeHealthLog 解析 NVMe SMART/Health Information Log Page（512 字节）。
 // 布局（NVMe Base Spec Figure 207）：
-//   Offset  Size  Field
-//   0x00    1     CriticalWarning（位 0=可用备用不足,1=温度越限,2=可靠性降级,3=只读,4=易失备份失败）
-//   0x01    2     Temperature（开尔文，uint16）
-//   0x03    1     AvailableSpare（%）
-//   0x04    1     AvailableSpareThreshold（%）
-//   0x05    1     PercentageUsed（%）
-//   0x06    1     EnduranceGroupCriticalWarningSummary
-//   0x08    8     DataUnitsRead（1000 * 512B 单位）
-//   0x10    8     DataUnitsWritten
-//   0x18    8     HostReadCommands
-//   0x20    8     HostWriteCommands
-//   0x28    8     ControllerBusyTime（分钟）
-//   0x30    8     PowerCycles
-//   0x38    8     PowerOnHours
-//   0x40    8     UnsafeShutdowns
-//   0x48    8     MediaErrors（= 用户说的 0E "介质与数据完整性错误计数"）
-//   0x50    8     NumErrorInfoLogEntries
-//   0x58    4     WarningCompTempTime（分钟）
-//   0x5C    4     CriticalCompTempTime（分钟）
-//   0x60..  8*8   SensorTemperature[8]（开尔文）
+//
+//	Offset  Size  Field
+//	0x00    1     CriticalWarning（位 0=可用备用不足,1=温度越限,2=可靠性降级,3=只读,4=易失备份失败）
+//	0x01    2     Temperature（开尔文，uint16）
+//	0x03    1     AvailableSpare（%）
+//	0x04    1     AvailableSpareThreshold（%）
+//	0x05    1     PercentageUsed（%）
+//	0x06    1     EnduranceGroupCriticalWarningSummary
+//	0x08    8     DataUnitsRead（1000 * 512B 单位）
+//	0x10    8     DataUnitsWritten
+//	0x18    8     HostReadCommands
+//	0x20    8     HostWriteCommands
+//	0x28    8     ControllerBusyTime（分钟）
+//	0x30    8     PowerCycles
+//	0x38    8     PowerOnHours
+//	0x40    8     UnsafeShutdowns
+//	0x48    8     MediaErrors（= 用户说的 0E "介质与数据完整性错误计数"）
+//	0x50    8     NumErrorInfoLogEntries
+//	0x58    4     WarningCompTempTime（分钟）
+//	0x5C    4     CriticalCompTempTime（分钟）
+//	0x60..  8*8   SensorTemperature[8]（开尔文）
 func parseNVMeHealthLog(data []byte) []Attr {
 	if len(data) < 0x58 {
 		return nil
@@ -111,6 +112,14 @@ func parseNVMeHealthLog(data []byte) []Attr {
 	spareThresh := data[0x04]
 	pctUsed := data[0x05]
 	mediaErrors := binary.LittleEndian.Uint64(data[0x48:0x50])
+	dataUnitsRead := binary.LittleEndian.Uint64(data[0x08:0x10])
+	dataUnitsWritten := binary.LittleEndian.Uint64(data[0x10:0x18])
+	powerCycles := binary.LittleEndian.Uint64(data[0x30:0x38])
+	powerOnHours := binary.LittleEndian.Uint64(data[0x38:0x40])
+	unsafeShutdowns := binary.LittleEndian.Uint64(data[0x40:0x48])
+	errorInfoEntries := binary.LittleEndian.Uint64(data[0x50:0x58])
+	warningTempTime := uint64(binary.LittleEndian.Uint32(data[0x58:0x5C]))
+	criticalTempTime := uint64(binary.LittleEndian.Uint32(data[0x5C:0x60]))
 
 	attrs = append(attrs, Attr{ID: NVMeCriticalWarning, Name: "Critical_Warning", Raw: uint64(cw), Kind: "nvme"})
 	attrs = append(attrs, Attr{ID: NVMeTemperature, Name: "Temperature_Kelvin", Raw: uint64(tempK), Kind: "nvme"})
@@ -118,6 +127,14 @@ func parseNVMeHealthLog(data []byte) []Attr {
 	attrs = append(attrs, Attr{ID: NVMeAvailSpareThresh, Name: "Available_Spare_Threshold", Raw: uint64(spareThresh), Kind: "nvme"})
 	attrs = append(attrs, Attr{ID: NVMePercentUsed, Name: "Percentage_Used", Raw: uint64(pctUsed), Kind: "nvme"})
 	attrs = append(attrs, Attr{ID: NVMeMediaErrors, Name: "Media_Data_Integrity_Errors", Raw: mediaErrors, Kind: "nvme"})
+	attrs = append(attrs, Attr{ID: NVMeDataUnitsRead, Name: "Data_Units_Read", Raw: dataUnitsRead, Kind: "nvme"})
+	attrs = append(attrs, Attr{ID: NVMeDataUnitsWritten, Name: "Data_Units_Written", Raw: dataUnitsWritten, Kind: "nvme"})
+	attrs = append(attrs, Attr{ID: NVMePowerCycles, Name: "Power_Cycles", Raw: powerCycles, Kind: "nvme"})
+	attrs = append(attrs, Attr{ID: NVMePowerOnHours, Name: "Power_On_Hours", Raw: powerOnHours, Kind: "nvme"})
+	attrs = append(attrs, Attr{ID: NVMeUnsafeShutdowns, Name: "Unsafe_Shutdowns", Raw: unsafeShutdowns, Kind: "nvme"})
+	attrs = append(attrs, Attr{ID: NVMeErrorInfoEntries, Name: "Error_Info_Log_Entries", Raw: errorInfoEntries, Kind: "nvme"})
+	attrs = append(attrs, Attr{ID: NVMeWarningTempTime, Name: "Warning_Temperature_Time", Raw: warningTempTime, Kind: "nvme"})
+	attrs = append(attrs, Attr{ID: NVMeCriticalTempTime, Name: "Critical_Temperature_Time", Raw: criticalTempTime, Kind: "nvme"})
 
 	// 只读模式（CriticalWarning bit 3）
 	if cw&(1<<3) != 0 {

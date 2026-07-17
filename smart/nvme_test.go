@@ -1,0 +1,51 @@
+package smart
+
+import (
+	"encoding/binary"
+	"testing"
+)
+
+func TestBuildNVMeGetLogPageUsesProtocolCommandLayout(t *testing.T) {
+	buf := buildNVMeGetLogPage(NVMeLogID_SMART_Health, 512)
+	if len(buf) != 640 {
+		t.Fatalf("got buffer length %d, want 640", len(buf))
+	}
+	if binary.LittleEndian.Uint32(buf[0x00:0x04]) != 1 ||
+		binary.LittleEndian.Uint32(buf[0x04:0x08]) != 56 ||
+		binary.LittleEndian.Uint32(buf[0x08:0x0C]) != STORAGE_PROTOCOL_TYPE_NVMe {
+		t.Fatalf("invalid protocol header: %x", buf[:16])
+	}
+	if buf[56] != NVMeGetLogPage {
+		t.Fatalf("got opcode 0x%02x, want 0x02", buf[56])
+	}
+	if got := binary.LittleEndian.Uint32(buf[96:100]); got != (127<<16)|NVMeLogID_SMART_Health {
+		t.Fatalf("got CDW10 0x%08x", got)
+	}
+	if binary.LittleEndian.Uint32(buf[0x24:0x28]) != 128 {
+		t.Fatalf("invalid data offset")
+	}
+}
+
+func TestParseNVMeHealthLog(t *testing.T) {
+	data := make([]byte, 512)
+	data[0] = 0x08
+	binary.LittleEndian.PutUint16(data[1:3], 300)
+	data[3] = 95
+	data[4] = 10
+	data[5] = 7
+	binary.LittleEndian.PutUint64(data[0x30:0x38], 12)
+	binary.LittleEndian.PutUint64(data[0x38:0x40], 34)
+	binary.LittleEndian.PutUint64(data[0x48:0x50], 2)
+	binary.LittleEndian.PutUint32(data[0x58:0x5C], 9)
+
+	attrs := parseNVMeHealthLog(data)
+	values := map[int]uint64{}
+	for _, a := range attrs {
+		values[a.ID] = a.Raw
+	}
+	if values[NVMeTemperature] != 300 || values[NVMePowerCycles] != 12 ||
+		values[NVMePowerOnHours] != 34 || values[NVMeMediaErrors] != 2 ||
+		values[NVMeWarningTempTime] != 9 || values[NVMeReadOnly] != 1 {
+		t.Fatalf("unexpected NVMe attributes: %+v", values)
+	}
+}
