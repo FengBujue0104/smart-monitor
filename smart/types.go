@@ -60,9 +60,10 @@ type Disk struct {
 	Firmware string
 	SizeGB   float64
 	Attrs    []Attr
+	// 设备报告的整体 SMART 状态（ATA pass-through 或 WMI 预测状态）。
+	SmartStatusKnown  bool // 是否成功读取整体 SMART status
+	SmartStatusPassed bool // 整体 SMART status 是否通过
 	// ATA 特有
-	SmartStatusKnown   bool // 是否成功读取 ATA SMART overall status
-	SmartStatusPassed  bool // ATA SMART overall status 是否通过
 	SMARTChecksumKnown bool // 是否检查了 ATA SMART 数据 checksum
 	SMARTChecksumValid bool // ATA SMART 数据 checksum 是否有效
 	// NVMe 特有

@@ -47,6 +47,7 @@ type Violation = smart.Violation
 func Evaluate(disks []smart.Disk) []Violation {
 	var out []Violation
 	for _, d := range disks {
+		out = append(out, evaluateOverallStatus(d)...)
 		switch d.Kind {
 		case smart.KindATA:
 			out = append(out, evaluateATA(d)...)
@@ -55,6 +56,21 @@ func Evaluate(disks []smart.Disk) []Violation {
 		}
 	}
 	return out
+}
+
+func evaluateOverallStatus(d smart.Disk) []Violation {
+	if !d.SmartStatusKnown || d.SmartStatusPassed {
+		return nil
+	}
+	return []Violation{{
+		DiskIndex: d.Index,
+		DiskModel: d.Model,
+		AttrID:    0,
+		AttrName:  "SMART_Overall_Health",
+		Current:   "FAILED",
+		Limit:     "PASSED",
+		Severity:  Critical,
+	}}
 }
 
 func evaluateATA(d smart.Disk) []Violation {
@@ -70,10 +86,6 @@ func evaluateATA(d smart.Disk) []Violation {
 			Severity:  sev,
 		})
 	}
-	if d.SmartStatusKnown && !d.SmartStatusPassed {
-		add(smart.Attr{ID: 0, Name: "SMART_Overall_Health"}, Critical, "FAILED", "PASSED")
-	}
-
 	for _, a := range d.Attrs {
 		switch a.ID {
 		case 0x05: // Reallocated_Sector_Ct
