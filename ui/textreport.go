@@ -23,8 +23,8 @@ func buildTextReport(disks []smart.Disk, vs []health.Violation) string {
 	b.WriteString(fmt.Sprintf("磁盘数: %d\n\n", len(disks)))
 
 	for _, d := range disks {
-		b.WriteString(fmt.Sprintf("[磁盘 %d] %s  (%s)  容量:%.1f GB  SMART:%s  S/N:%s  FW:%s\n",
-			d.Index, d.Model, d.Kind, d.SizeGB, smartStatusText(d), d.Serial, d.Firmware))
+		b.WriteString(fmt.Sprintf("[磁盘 %d] %s  (%s)  容量:%.1f GB  SMART:%s  校验和:%s  S/N:%s  FW:%s\n",
+			d.Index, d.Model, d.Kind, d.SizeGB, smartStatusText(d), smartChecksumText(d), d.Serial, d.Firmware))
 		if len(d.Attrs) == 0 {
 			b.WriteString("  (未读取到 SMART 属性)\n\n")
 			continue

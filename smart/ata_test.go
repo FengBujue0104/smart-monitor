@@ -2,6 +2,17 @@ package smart
 
 import "testing"
 
+func TestBuildSmartCmdUsesATASMARTTaskFileSignature(t *testing.T) {
+	cmd := buildSmartCmd(ATA_CMD_SMART, SMART_READ_DATA, 3, make([]byte, 512))
+	regs := cmd[0x04:0x0C]
+	if regs[0] != SMART_READ_DATA || regs[1] != 1 || regs[2] != 0 || regs[3] != 0x4F || regs[4] != 0xC2 || regs[6] != ATA_CMD_SMART {
+		t.Fatalf("unexpected SMART task file: %x", regs)
+	}
+	if cmd[0x0C] != 3 {
+		t.Fatalf("unexpected drive number: %d", cmd[0x0C])
+	}
+}
+
 func TestReadSMARTDataUsesStandardHeader(t *testing.T) {
 	data := make([]byte, 512)
 	data[0] = 1
@@ -51,5 +62,23 @@ func TestParseSMARTDriverStatus(t *testing.T) {
 	out[4], out[5] = 0, 0x51
 	if err := parseSMARTDriverStatus(out); err == nil {
 		t.Fatal("expected IDE error")
+	}
+}
+
+func TestSMARTChecksumValid(t *testing.T) {
+	data := make([]byte, 512)
+	data[0] = 1
+	data[511] = 0xFF
+	var sum byte
+	for _, b := range data[:511] {
+		sum += b
+	}
+	data[511] = -sum
+	if !smartChecksumValid(data) {
+		t.Fatal("expected valid SMART checksum")
+	}
+	data[10]++
+	if smartChecksumValid(data) {
+		t.Fatal("expected invalid SMART checksum")
 	}
 }

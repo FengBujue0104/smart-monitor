@@ -47,3 +47,10 @@ func TestDiskSummaryShowsOverallSMARTStatusWhenKnown(t *testing.T) {
 		t.Fatalf("unexpected failed SMART summary: %q", got)
 	}
 }
+
+func TestDiskSummaryShowsChecksumWarning(t *testing.T) {
+	d := smart.Disk{Model: "Test HDD", SMARTChecksumKnown: true, SMARTChecksumValid: false, Attrs: []smart.Attr{{ID: 1}}}
+	if got := diskSummary(d); !strings.Contains(got, "校验和异常") || smartChecksumText(d) != "异常" {
+		t.Fatalf("unexpected checksum summary: %q", got)
+	}
+}

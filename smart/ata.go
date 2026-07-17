@@ -64,11 +64,13 @@ func buildSmartCmd(cmd, sub, driveNum byte, buf []byte) []byte {
 	reg := raw[0x04:0x0C]
 	switch cmd {
 	case ATA_CMD_SMART:
-		reg[0] = sub  // bFeaturesReg = 子命令
-		reg[1] = 0    // bSectorCountReg
-		reg[2] = 0x4F // bSectorNumberReg（LBA Low，SMART 签名）
-		reg[3] = 0xC2 // bCylLowReg（LBA Mid，SMART 签名）
-		reg[4] = 0    // bCylHighReg
+		reg[0] = sub // bFeaturesReg = 子命令
+		reg[1] = 1   // bSectorCountReg：SMART data/thresholds 各传输一个扇区
+		reg[2] = 0   // bSectorNumberReg（LBA Low）
+		// ATA SMART 的固定签名在 LBA Mid/High（即 Cylinder Low/High），
+		// 不能写入 SectorNumber/CylinderLow；否则多数控制器会拒绝命令。
+		reg[3] = 0x4F // bCylLowReg（LBA Mid，SMART 签名低字节）
+		reg[4] = 0xC2 // bCylHighReg（LBA High，SMART 签名高字节）
 		reg[5] = 0xA0 // bDriveHeadReg（Device = master）
 		reg[6] = cmd  // bCommandReg
 		reg[7] = 0    // bReserved
@@ -104,8 +106,8 @@ func buildSMARTReturnStatus() []byte {
 	// PreviousTaskFile is zero. CurrentTaskFile is the ATA task-file register set.
 	tf := buf[taskFileOffset:]
 	tf[0] = SMART_RETURN_STATUS // Features: SMART RETURN STATUS subcommand
-	tf[2] = 0x4F                // LBA low signature
-	tf[3] = 0xC2                // LBA mid signature
+	tf[3] = 0x4F                // LBA Mid / Cylinder Low SMART signature
+	tf[4] = 0xC2                // LBA High / Cylinder High SMART signature
 	tf[5] = 0xA0                // Device
 	tf[6] = ATA_CMD_SMART
 	return buf
@@ -202,11 +204,27 @@ func ReadIdentify(h windows.Handle, driveNum byte) (model, serial, firmware stri
 
 // ReadSMARTData 读取 SMART 属性表。
 func ReadSMARTData(h windows.Handle, driveNum byte) ([]Attr, bool, error) {
+	attrs, ok, _, err := ReadSMARTDataDetailed(h, driveNum)
+	return attrs, ok, err
+}
+
+func ReadSMARTDataDetailed(h windows.Handle, driveNum byte) ([]Attr, bool, bool, error) {
 	data, err := issueSmartCommand(h, ATA_CMD_SMART, SMART_READ_DATA, driveNum)
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
-	return parseSMARTData(data), true, nil
+	return parseSMARTData(data), true, smartChecksumValid(data), nil
+}
+
+func smartChecksumValid(data []byte) bool {
+	if len(data) < 512 {
+		return false
+	}
+	var sum byte
+	for _, b := range data[:512] {
+		sum += b
+	}
+	return sum == 0
 }
 
 func parseSMARTData(data []byte) []Attr {

@@ -10,7 +10,7 @@ func TestBuildSMARTReturnStatus(t *testing.T) {
 	if len(buf) != 48 || binary.LittleEndian.Uint16(buf[0:2]) != 48 {
 		t.Fatalf("unexpected ATA pass-through buffer length/header: %d", len(buf))
 	}
-	if buf[40] != SMART_RETURN_STATUS || buf[42] != 0x4F || buf[43] != 0xC2 || buf[46] != ATA_CMD_SMART {
+	if buf[40] != SMART_RETURN_STATUS || buf[42] != 0 || buf[43] != 0x4F || buf[44] != 0xC2 || buf[46] != ATA_CMD_SMART {
 		t.Fatalf("unexpected task file: %x", buf[40:48])
 	}
 }
