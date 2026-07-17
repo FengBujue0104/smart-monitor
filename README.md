@@ -91,3 +91,4 @@ ATA SMART 数据页校验和异常会作为数据完整性警告显示，并触�
 2. 在已知坏盘上 0x05!=0 触发红色告警
 3. NVMe 盘能显示 Temperature / PercentageUsed / MediaErrors
 4. 复制报表粘贴到记事本/微信无乱码（UTF-16 BOM）
+5. 对支持两条路径的 ATA 盘，交叉比对 IOCTL 与 WMI 的属性 ID、Raw、当前值、最差值和阈值；两者应一致。
