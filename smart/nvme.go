@@ -71,11 +71,26 @@ func issueNVMeGetLogPage(h windows.Handle, logID uint8) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("IOCTL_STORAGE_PROTOCOL_COMMAND logID=0x%02X err=%w", logID, err)
 	}
+	if err := parseNVMeProtocolStatus(outBuf); err != nil {
+		return nil, fmt.Errorf("NVMe logID=0x%02X protocol status: %w", logID, err)
+	}
 	const dataOffset = 144
 	if bytesReturned < uint32(dataOffset+512) {
 		return nil, fmt.Errorf("NVMe 返回过短: got=%d", bytesReturned)
 	}
 	return append([]byte(nil), outBuf[dataOffset:dataOffset+512]...), nil
+}
+
+func parseNVMeProtocolStatus(buf []byte) error {
+	if len(buf) < 0x18 {
+		return fmt.Errorf("protocol response too short")
+	}
+	status := binary.LittleEndian.Uint32(buf[0x10:0x14])
+	if status != 1 { // STORAGE_PROTOCOL_STATUS_SUCCESS
+		code := binary.LittleEndian.Uint32(buf[0x14:0x18])
+		return fmt.Errorf("return status=0x%08X error code=0x%08X", status, code)
+	}
+	return nil
 }
 
 // parseNVMeHealthLog 解析 NVMe SMART/Health Information Log Page（512 字节）。
@@ -136,6 +151,18 @@ func parseNVMeHealthLog(data []byte) []Attr {
 	attrs = append(attrs, Attr{ID: NVMeErrorInfoEntries, Name: "Error_Info_Log_Entries", Raw: errorInfoEntries, Kind: "nvme"})
 	attrs = append(attrs, Attr{ID: NVMeWarningTempTime, Name: "Warning_Temperature_Time", Raw: warningTempTime, Kind: "nvme"})
 	attrs = append(attrs, Attr{ID: NVMeCriticalTempTime, Name: "Critical_Temperature_Time", Raw: criticalTempTime, Kind: "nvme"})
+	for i := 0; i < 8; i++ {
+		off := 0x60 + i*2
+		temp := binary.LittleEndian.Uint16(data[off : off+2])
+		if temp == 0 {
+			continue
+		}
+		attrs = append(attrs, Attr{
+			ID:   NVMeTemperatureSensor1 + i,
+			Name: fmt.Sprintf("Temperature_Sensor_%d_Kelvin", i+1),
+			Raw:  uint64(temp), Kind: "nvme",
+		})
+	}
 
 	// 只读模式（CriticalWarning bit 3）
 	if cw&(1<<3) != 0 {

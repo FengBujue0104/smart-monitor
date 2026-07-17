@@ -232,6 +232,9 @@ func attrRawStr(a smart.Attr) string {
 		case smart.NVMeWarningTempTime, smart.NVMeCriticalTempTime:
 			return fmt.Sprintf("%d min", a.Raw)
 		}
+		if a.ID >= smart.NVMeTemperatureSensor1 && a.ID <= smart.NVMeTemperatureSensor8 {
+			return fmt.Sprintf("%d°C", int(a.Raw)-273)
+		}
 	}
 	if a.ID == 0xC2 || a.ID == 0xB9 || a.ID == 0xBE {
 		current := a.Raw & 0xFF

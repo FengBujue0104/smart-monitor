@@ -37,15 +37,29 @@ func TestParseNVMeHealthLog(t *testing.T) {
 	binary.LittleEndian.PutUint64(data[0x38:0x40], 34)
 	binary.LittleEndian.PutUint64(data[0x48:0x50], 2)
 	binary.LittleEndian.PutUint32(data[0x58:0x5C], 9)
+	binary.LittleEndian.PutUint16(data[0x60:0x62], 310)
 
 	attrs := parseNVMeHealthLog(data)
 	values := map[int]uint64{}
 	for _, a := range attrs {
 		values[a.ID] = a.Raw
 	}
-	if values[NVMeTemperature] != 300 || values[NVMePowerCycles] != 12 ||
+	if values[NVMeTemperature] != 300 || values[NVMeTemperatureSensor1] != 310 || values[NVMePowerCycles] != 12 ||
 		values[NVMePowerOnHours] != 34 || values[NVMeMediaErrors] != 2 ||
 		values[NVMeWarningTempTime] != 9 || values[NVMeReadOnly] != 1 {
 		t.Fatalf("unexpected NVMe attributes: %+v", values)
+	}
+}
+
+func TestParseNVMeProtocolStatus(t *testing.T) {
+	buf := make([]byte, 0x18)
+	binary.LittleEndian.PutUint32(buf[0x10:0x14], 1)
+	if err := parseNVMeProtocolStatus(buf); err != nil {
+		t.Fatalf("unexpected success error: %v", err)
+	}
+	binary.LittleEndian.PutUint32(buf[0x10:0x14], 2)
+	binary.LittleEndian.PutUint32(buf[0x14:0x18], 0x1234)
+	if err := parseNVMeProtocolStatus(buf); err == nil {
+		t.Fatal("expected protocol failure")
 	}
 }
