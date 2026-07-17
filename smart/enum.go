@@ -34,7 +34,9 @@ const (
 	StorageAdapterProperty     = 1
 	PropertyStandardQuery      = 0
 	IOCTL_DISK_GET_LENGTH_INFO = 0x0007405C
-	maxPhysDrives              = 32
+	// Windows exposes physical disks as \\.\PhysicalDriveN. 32 is too small
+	// for workstations with HBAs, storage pools, or attached enclosures.
+	maxPhysDrives = 256
 )
 
 // queryStorageDevice 发 IOCTL_STORAGE_QUERY_PROPERTY，返回原始描述符字节。
