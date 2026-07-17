@@ -109,3 +109,16 @@ func TestReportModelShowsDiskLevelSMARTDiagnostics(t *testing.T) {
 		t.Fatalf("unexpected checksum diagnostic row: id=%q name=%q status=%q", got, m.Value(1, 4), m.Value(1, 9))
 	}
 }
+
+func TestAlertBannerTextRepresentsCurrentScanState(t *testing.T) {
+	if got := alertBannerText([]smart.Disk{{Kind: smart.KindATA, Attrs: []smart.Attr{{ID: 1}}}}, nil); !strings.Contains(got, "安全范围") {
+		t.Fatalf("unexpected safe banner: %q", got)
+	}
+	if got := alertBannerText([]smart.Disk{{Kind: smart.KindATA}}, nil); !strings.Contains(got, "无法得出完整健康结论") {
+		t.Fatalf("unexpected incomplete banner: %q", got)
+	}
+	vs := []health.Violation{{DiskIndex: 0, AttrName: "SMART_Overall_Health", Current: "FAILED", Limit: "PASSED", Severity: health.Critical}}
+	if got := alertBannerText([]smart.Disk{{Kind: smart.KindATA}}, vs); !strings.Contains(got, "SMART_Overall_Health") || !strings.Contains(got, "未读取到 SMART 数据") {
+		t.Fatalf("unexpected violation banner: %q", got)
+	}
+}

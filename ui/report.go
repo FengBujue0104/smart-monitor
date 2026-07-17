@@ -18,6 +18,7 @@ type ReportWin struct {
 	disks      []smart.Disk
 	violations []health.Violation
 	tv         *walk.TableView
+	banner     *walk.Label
 }
 
 // RunReport 显示报表。violations 非空时弹出红色告警条。
@@ -32,7 +33,12 @@ func RunReport(disks []smart.Disk, violations []health.Violation) error {
 		Size:     Size{Width: 1000, Height: 640},
 		Layout:   VBox{Margins: Margins{Left: 8, Top: 8, Right: 8, Bottom: 8}},
 		Children: []Widget{
-			alertBanner(disks, violations),
+			Label{
+				AssignTo:  &rw.banner,
+				Text:      alertBannerText(disks, violations),
+				Font:      Font{Family: "微软雅黑", PointSize: 11},
+				TextColor: alertBannerColor(disks, violations),
+			},
 			Label{
 				Text:      fmt.Sprintf("检测时间: %s | 主机: %s", time.Now().Format("2006-01-02 15:04:05"), hostName()),
 				Font:      Font{Family: "微软雅黑", PointSize: 10},
@@ -420,20 +426,12 @@ func unreadSMARTCount(disks []smart.Disk) int {
 	return count
 }
 
-func alertBanner(disks []smart.Disk, vs []health.Violation) Widget {
+func alertBannerText(disks []smart.Disk, vs []health.Violation) string {
 	if len(vs) == 0 {
 		if unread := unreadSMARTCount(disks); unread > 0 {
-			return Label{
-				Text:      fmt.Sprintf("⚠️ %d 块磁盘未读取到 SMART 数据，无法得出完整健康结论", unread),
-				Font:      Font{Family: "微软雅黑", PointSize: 11},
-				TextColor: walk.RGB(0xB0, 0x60, 0x00),
-			}
+			return fmt.Sprintf("⚠️ %d 块磁盘未读取到 SMART 数据，无法得出完整健康结论", unread)
 		}
-		return Label{
-			Text:      "✅ 所有监测的 SMART 指标均处于安全范围",
-			Font:      Font{Family: "微软雅黑", PointSize: 11},
-			TextColor: walk.RGB(0x1B, 0x7A, 0x2F),
-		}
+		return "✅ 所有监测的 SMART 指标均处于安全范围"
 	}
 	var lines []string
 	for _, v := range vs {
@@ -447,14 +445,17 @@ func alertBanner(disks []smart.Disk, vs []health.Violation) Widget {
 	if unread := unreadSMARTCount(disks); unread > 0 {
 		lines = append(lines, fmt.Sprintf("  ⚠️ %d 块磁盘未读取到 SMART 数据", unread))
 	}
-	return TextEdit{
-		ReadOnly:   true,
-		Text:       strings.Join(lines, "\n"),
-		TextColor:  walk.RGB(0x7A, 0x00, 0x00),
-		Background: SolidColorBrush{Color: walk.RGB(0xFD, 0xDE, 0xDE)},
-		Font:       Font{Family: "微软雅黑", PointSize: 11},
-		MinSize:    Size{Width: 400, Height: 80},
+	return strings.Join(lines, "\n")
+}
+
+func alertBannerColor(disks []smart.Disk, vs []health.Violation) walk.Color {
+	if len(vs) > 0 {
+		return walk.RGB(0x7A, 0x00, 0x00)
 	}
+	if unreadSMARTCount(disks) > 0 {
+		return walk.RGB(0xB0, 0x60, 0x00)
+	}
+	return walk.RGB(0x1B, 0x7A, 0x2F)
 }
 
 // ===== 行为 =====
@@ -476,6 +477,10 @@ func (rw *ReportWin) rescan() {
 	}
 	rw.disks = disks
 	rw.violations = health.Evaluate(disks)
+	if rw.banner != nil {
+		_ = rw.banner.SetText(alertBannerText(disks, rw.violations))
+		rw.banner.SetTextColor(alertBannerColor(disks, rw.violations))
+	}
 	if rw.tv != nil {
 		rw.tv.SetModel(&reportModel{disks: disks, violations: rw.violations})
 	}
