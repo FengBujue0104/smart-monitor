@@ -58,3 +58,26 @@ func TestFindStatusForDriveRejectsAmbiguousModel(t *testing.T) {
 		t.Fatal("ambiguous model should not produce a status")
 	}
 }
+
+func TestApplyWMIATADataChecksSMARTChecksum(t *testing.T) {
+	data := make([]byte, 512)
+	data[0] = 1
+	data[2] = 0x05
+	data[3] = 0x01
+	data[5] = 100
+	for _, b := range data[:511] {
+		data[511] -= b
+	}
+
+	d := Disk{Model: "Test"}
+	applyWMIATAData(&d, data, nil)
+	if len(d.Attrs) != 1 || !d.SMARTChecksumKnown || !d.SMARTChecksumValid {
+		t.Fatalf("unexpected valid WMI SMART data: %+v", d)
+	}
+
+	data[10]++
+	applyWMIATAData(&d, data, nil)
+	if d.SMARTChecksumValid {
+		t.Fatalf("expected invalid WMI SMART checksum: %+v", d)
+	}
+}

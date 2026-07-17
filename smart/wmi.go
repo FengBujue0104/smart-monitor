@@ -112,20 +112,30 @@ func DiscoverWMI() ([]Disk, error) {
 			d.SmartStatusPassed = !predictFailure
 		}
 		if d.Kind == KindATA && len(data) >= 14 {
-			attrs := parseWMIAttributes(data)
-			// 阈值
 			th, ok := findDataForDriveOK(threshMap, drv)
-			if ok && len(th) >= 14 {
-				applyThresholds(attrs, th)
+			if !ok {
+				th = nil
 			}
-			for i := range attrs {
-				attrs[i].Name = ATAAttrNameForModel(d.Model, attrs[i].ID)
-			}
-			d.Attrs = attrs
+			applyWMIATAData(&d, data, th)
 		}
 		disks = append(disks, d)
 	}
 	return disks, nil
+}
+
+func applyWMIATAData(d *Disk, data, thresholds []byte) {
+	attrs := parseWMIAttributes(data)
+	if len(thresholds) >= 14 {
+		applyThresholds(attrs, thresholds)
+	}
+	for i := range attrs {
+		attrs[i].Name = ATAAttrNameForModel(d.Model, attrs[i].ID)
+	}
+	d.Attrs = attrs
+	if len(data) >= 512 {
+		d.SMARTChecksumKnown = true
+		d.SMARTChecksumValid = smartChecksumValid(data)
+	}
 }
 
 func findStatusForDrive(m map[string]bool, drv wmiDiskDrive) (bool, bool) {
