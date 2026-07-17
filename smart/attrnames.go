@@ -1,5 +1,7 @@
 package smart
 
+import "strings"
+
 // ATAAttrName 返回 ATA 属性 ID 的规范名（来源：smartmontools attributedictionary.h / ATA8-ACS / CrystalDiskInfo）。
 // 注：0x0E 与 0xBC 在 ATA 规范中未统一定义（厂商特定），保留最常见厂牌含义。
 func ATAAttrName(id int) string {
@@ -7,6 +9,42 @@ func ATAAttrName(id int) string {
 		return n
 	}
 	return "Unknown_0x" + uitoa(id)
+}
+
+// ATAAttrNameForModel supplies common vendor-specific aliases without changing
+// the numeric SMART attribute identity.
+func ATAAttrNameForModel(model string, id int) string {
+	name := ATAAttrName(id)
+	m := strings.ToLower(model)
+	switch {
+	case strings.Contains(m, "samsung"):
+		switch id {
+		case 0xB1:
+			return "Wear_Leveling_Count"
+		case 0xB3:
+			return "Used_Reserved_Block_Count"
+		case 0xB5:
+			return "Program_Fail_Count"
+		case 0xB6:
+			return "Erase_Fail_Count"
+		case 0xE8:
+			return "Available_Reserved_Space"
+		}
+	case strings.Contains(m, "western digital") || strings.Contains(m, "wd "):
+		switch id {
+		case 0xC4:
+			return "Reallocation_Event_Count"
+		case 0xF1:
+			return "Total_LBAs_Written"
+		case 0xF2:
+			return "Total_LBAs_Read"
+		}
+	case strings.Contains(m, "seagate"):
+		if id == 0xBC {
+			return "Command_Timeout"
+		}
+	}
+	return name
 }
 
 func uitoa(v int) string {

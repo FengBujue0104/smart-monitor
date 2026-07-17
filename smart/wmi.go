@@ -99,6 +99,9 @@ func DiscoverWMI() ([]Disk, error) {
 			if ok && len(th) >= 14 {
 				applyThresholds(attrs, th)
 			}
+			for i := range attrs {
+				attrs[i].Name = ATAAttrNameForModel(d.Model, attrs[i].ID)
+			}
 			d.Attrs = attrs
 		}
 		disks = append(disks, d)

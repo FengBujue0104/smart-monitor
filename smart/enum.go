@@ -13,10 +13,11 @@ type windowsHandle = windows.Handle
 
 // STORAGE_PROPERTY_QUERY 用于 IOCTL_STORAGE_QUERY_PROPERTY。
 // 布局：
-//   Offset  Size  Field
-//   0x00    4     PropertyId（StorageDeviceProperty=0 / StorageAdapterProperty=1）
-//   0x04    4     QueryType（PropertyStandardQuery=0）
-//   0x08    1     AdditionalParameters[0]（PropertyExistsQuery 用）
+//
+//	Offset  Size  Field
+//	0x00    4     PropertyId（StorageDeviceProperty=0 / StorageAdapterProperty=1）
+//	0x04    4     QueryType（PropertyStandardQuery=0）
+//	0x08    1     AdditionalParameters[0]（PropertyExistsQuery 用）
 type storagePropertyQuery struct {
 	PropertyID uint32
 	QueryType  uint32
@@ -28,7 +29,7 @@ type storagePropertyQuery struct {
 // 实际是一个变长结构：头 + VendorID/ProductID/ProductRevision/SerialNumber 偏移 + 字符串。
 // 头部长 36 字节（Windows SDK），随后 4 个偏移，再 1 字节 DeviceType/DeviceTypeModifier，+ 1 字节 Removable/CommandQueueing，再 + 字符串。
 const (
-	StorageDeviceProperty = 0
+	StorageDeviceProperty  = 0
 	StorageAdapterProperty = 1
 	PropertyStandardQuery  = 0
 	maxPhysDrives          = 32
@@ -60,19 +61,20 @@ func queryStorageDevice(h windows.Handle) ([]byte, error) {
 
 // parseStorageDescriptor 从 STORAGE_DEVICE_DESCRIPTOR 输出中解析型号/序列号/固件/容量。
 // 典型字段布局（Windows SDK，小端）：
-//   0x00: Version(4)
-//   0x04: Size(4)
-//   0x08: DeviceType(1)
-//   0x09: DeviceTypeModifier(1)
-//   0x0A: RemovableMedia(1)
-//   0x0B: CommandQueueing(1)
-//   0x0C: VendorIdOffset(4)（0 表示无）
-//   0x10: ProductIdOffset(4)
-//   0x14: ProductRevisionOffset(4)
-//   0x18: SerialNumberOffset(4)
-//   0x1C: BusType(STORAGE_BUS_TYPE: 0x11=NVMe 或 0x07=SATA 等)
-//   0x20: RawPropertiesLength(4)
-//   0x24: RawDeviceProperties[RawPropertiesLength]
+//
+//	0x00: Version(4)
+//	0x04: Size(4)
+//	0x08: DeviceType(1)
+//	0x09: DeviceTypeModifier(1)
+//	0x0A: RemovableMedia(1)
+//	0x0B: CommandQueueing(1)
+//	0x0C: VendorIdOffset(4)（0 表示无）
+//	0x10: ProductIdOffset(4)
+//	0x14: ProductRevisionOffset(4)
+//	0x18: SerialNumberOffset(4)
+//	0x1C: BusType(STORAGE_BUS_TYPE: 0x11=NVMe 或 0x07=SATA 等)
+//	0x20: RawPropertiesLength(4)
+//	0x24: RawDeviceProperties[RawPropertiesLength]
 func parseStorageDescriptor(b []byte) (vendor, product, revision, serial string, busType uint32) {
 	if len(b) < 0x24 {
 		return
@@ -110,13 +112,15 @@ func OpenDeviceForTest(path string) (closer interface{ Close() error }, err erro
 }
 
 type deviceHandle struct{ h windowsHandle }
+
 func (d *deviceHandle) Close() error { return windows.CloseHandle(d.h) }
 
 // Discover 枚举 PhysicalDrive 0..maxPhysDrives-1，返回每块盘的统一 Disk（仅元数据 + 已采集的健康属性）。
 // 采集顺序：
-//   1. IOCTL_STORAGE_QUERY_PROPERTY 获取型号/序列/固件/总线类型。
-//   2. 若 BusType=NVMe -> ReadNVMeHealth()。
-//   3. 否则 (SATA/ATA) -> ReadIdentify + ReadSMARTData + ReadSMARTThresholds
+//  1. IOCTL_STORAGE_QUERY_PROPERTY 获取型号/序列/固件/总线类型。
+//  2. 若 BusType=NVMe -> ReadNVMeHealth()。
+//  3. 否则 (SATA/ATA) -> ReadIdentify + ReadSMARTData + ReadSMARTThresholds
+//
 // 每一步失败则降级：仍返回 Disk（Attrs 可能为空或仅 NVMe 健康属性）。
 func Discover() ([]Disk, error) {
 	var disks []Disk
@@ -184,6 +188,9 @@ func Discover() ([]Disk, error) {
 							attrs[i].Thresh = t
 						}
 					}
+				}
+				for i := range attrs {
+					attrs[i].Name = ATAAttrNameForModel(d.Model, attrs[i].ID)
 				}
 				d.Attrs = attrs
 			}
