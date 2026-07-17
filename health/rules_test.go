@@ -27,6 +27,16 @@ func TestATAReadErrorUsesNormalizedThreshold(t *testing.T) {
 	}
 }
 
+func TestATAAlternateTemperatureAttributesUseTemperatureThresholds(t *testing.T) {
+	for _, id := range []int{0xB9, 0xBE, 0xC2} {
+		d := smart.Disk{Index: 0, Kind: smart.KindATA, Attrs: []smart.Attr{{ID: id, Raw: 61}}}
+		got := Evaluate([]smart.Disk{d})
+		if len(got) != 1 || got[0].Severity != Critical || got[0].Current != "61°C" {
+			t.Fatalf("attribute 0x%02X should create critical temperature violation: %+v", id, got)
+		}
+	}
+}
+
 func TestATAOverallSMARTFailureCreatesCriticalViolation(t *testing.T) {
 	d := smart.Disk{Index: 0, Kind: smart.KindATA, SmartStatusKnown: true, SmartStatusPassed: false}
 	got := Evaluate([]smart.Disk{d})

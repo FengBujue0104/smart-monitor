@@ -139,7 +139,7 @@ func evaluateATA(d smart.Disk) []Violation {
 			}
 		case 0x0E: // 厂牌特定
 			// 没有型号/厂商语义时不报警，避免把未知厂商字段误判为故障。
-		case 0xC2: // Temperature
+		case 0xC2, 0xB9, 0xBE: // Temperature / vendor temperature variants
 			// raw 值 48 位中，最低字节是当前温度（°C），高位字节可能是历史最高/最低。
 			// 来源：ATA8-ACS 温度属性布局 raw[0]=当前, raw[1]=最低, raw[2]=最高（厂牌差异）。
 			tempCur := int(a.Raw & 0xFF)
@@ -185,7 +185,7 @@ func evaluateATA(d smart.Disk) []Violation {
 // device-provided normalized-value threshold.
 func shouldApplyGenericATAThreshold(a smart.Attr) bool {
 	switch a.ID {
-	case 0x01, 0x05, 0xBB, 0xBC, 0xC2, 0xC5, 0xC6, 0xE8, 0xE9, 0xAD, 0xB1:
+	case 0x01, 0x05, 0xB9, 0xBB, 0xBC, 0xBE, 0xC2, 0xC5, 0xC6, 0xE8, 0xE9, 0xAD, 0xB1:
 		return false
 	}
 	return true
