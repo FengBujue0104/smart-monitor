@@ -40,6 +40,9 @@ func TestAttrDisplaySeparatesRawAndNormalizedValues(t *testing.T) {
 	if got := attrRawStr(nvmeHighCounter); got != "0x00000000000000010000000000000000" {
 		t.Fatalf("unexpected 128-bit NVMe counter display: %q", got)
 	}
+	if got := attrRawStr(smart.Attr{ID: smart.NVMeEnduranceGroupCriticalWarning, Raw: 4, Kind: "nvme"}); got != "0x04" {
+		t.Fatalf("unexpected NVMe critical warning display: %q", got)
+	}
 }
 
 func TestDiskSummaryIncludesCapacityAndReadState(t *testing.T) {

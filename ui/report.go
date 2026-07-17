@@ -276,6 +276,8 @@ func (m *reportModel) StyleCell(c *walk.CellStyle) {
 func attrRawStr(a smart.Attr) string {
 	if a.Kind == "nvme" {
 		switch a.ID {
+		case smart.NVMeCriticalWarning, smart.NVMeEnduranceGroupCriticalWarning:
+			return fmt.Sprintf("0x%02X", a.Raw)
 		case smart.NVMeTemperature:
 			if a.Raw == 0 {
 				return "N/A"
