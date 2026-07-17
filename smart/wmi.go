@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/yusufpapurcu/wmi"
 )
@@ -128,19 +129,19 @@ func DiscoverWMI() ([]Disk, error) {
 }
 
 func findStatusForDrive(m map[string]bool, drv wmiDiskDrive) (bool, bool) {
-	pnp := strings.ToLower(strings.ReplaceAll(cleanWMIString(drv.PNPDeviceID), " ", ""))
-	model := strings.ToLower(cleanWMIString(drv.Model))
-	serial := strings.ToLower(cleanWMIString(drv.SerialNumber))
+	pnp := normalizeWMIKey(drv.PNPDeviceID)
+	model := normalizeWMIKey(drv.Model)
+	serial := normalizeWMIKey(drv.SerialNumber)
 	var modelMatches []bool
 	for name, predictFailure := range m {
-		n := strings.ToLower(name)
-		if pnp != "" && strings.Contains(strings.ReplaceAll(n, " ", ""), pnp) {
+		n := normalizeWMIKey(name)
+		if pnp != "" && strings.Contains(n, pnp) {
 			return predictFailure, true
 		}
-		if serial != "" && strings.Contains(n, serial) {
+		if serial != "" && wmiIdentityMatch(n, drv.SerialNumber) {
 			return predictFailure, true
 		}
-		if model != "" && strings.Contains(n, model) {
+		if model != "" && wmiIdentityMatch(n, drv.Model) {
 			modelMatches = append(modelMatches, predictFailure)
 		}
 	}
@@ -159,9 +160,9 @@ func findDataForDriveOK(m map[string][]byte, drv wmiDiskDrive) ([]byte, bool) {
 // findDataForDrive 根据型号/序列号子串匹配 WMI InstanceName。
 func findDataForDrive(m map[string][]byte, drv wmiDiskDrive) ([]byte, string) {
 	// 优先用 PNPDeviceID/InstanceName 的设备路径关联，避免同型号磁盘串数据。
-	pnp := strings.ToLower(strings.ReplaceAll(cleanWMIString(drv.PNPDeviceID), " ", ""))
-	model := cleanWMIString(drv.Model)
-	serial := cleanWMIString(drv.SerialNumber)
+	pnp := normalizeWMIKey(drv.PNPDeviceID)
+	model := normalizeWMIKey(drv.Model)
+	serial := normalizeWMIKey(drv.SerialNumber)
 	var modelMatches []struct {
 		data []byte
 		name string
@@ -170,14 +171,14 @@ func findDataForDrive(m map[string][]byte, drv wmiDiskDrive) ([]byte, string) {
 		if len(data) < 14 {
 			continue
 		}
-		n := strings.ToLower(name)
-		if pnp != "" && strings.Contains(strings.ReplaceAll(n, " ", ""), pnp) {
+		n := normalizeWMIKey(name)
+		if pnp != "" && strings.Contains(n, pnp) {
 			return data, name
 		}
-		if serial != "" && strings.Contains(n, strings.ToLower(serial)) {
+		if serial != "" && wmiIdentityMatch(n, drv.SerialNumber) {
 			return data, name
 		}
-		if model != "" && strings.Contains(n, strings.ToLower(model)) {
+		if model != "" && wmiIdentityMatch(n, drv.Model) {
 			modelMatches = append(modelMatches, struct {
 				data []byte
 				name string
@@ -189,6 +190,38 @@ func findDataForDrive(m map[string][]byte, drv wmiDiskDrive) ([]byte, string) {
 	}
 	// 关联失败时必须返回空，不能把另一块盘的数据伪装成本盘数据。
 	return nil, ""
+}
+
+func normalizeWMIKey(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(cleanWMIString(s)) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+func wmiIdentityMatch(normalizedName, identity string) bool {
+	normalized := normalizeWMIKey(identity)
+	if normalized == "" {
+		return false
+	}
+	if strings.Contains(normalizedName, normalized) {
+		return true
+	}
+	parts := strings.FieldsFunc(cleanWMIString(identity), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	})
+	if len(parts) < 2 {
+		return false
+	}
+	for _, part := range parts {
+		if !strings.Contains(normalizedName, normalizeWMIKey(part)) {
+			return false
+		}
+	}
+	return true
 }
 
 // parseWMIAttributes 解析 WMI VendorSpecific 字节为 Attr 列表。

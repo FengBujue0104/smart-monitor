@@ -27,6 +27,17 @@ func TestFindDataForDriveDoesNotReuseUnmatchedData(t *testing.T) {
 	}
 }
 
+func TestFindDataForDriveNormalizesModelSeparators(t *testing.T) {
+	m := map[string][]byte{
+		"SCSI\\Disk&Ven_Samsung&Prod_SSD_980_PRO\\1": make([]byte, 14),
+	}
+	drv := wmiDiskDrive{Model: "Samsung SSD 980 PRO"}
+	data, instance := findDataForDrive(m, drv)
+	if data == nil || instance == "" {
+		t.Fatalf("expected normalized model match, instance=%q", instance)
+	}
+}
+
 func TestFindStatusForDriveUsesUniqueDeviceMatch(t *testing.T) {
 	m := map[string]bool{
 		"SCSI\\Disk&Ven_A&Prod_DriveA\\1": true,
