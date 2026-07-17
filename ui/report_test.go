@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"smonitor/health"
 	"smonitor/smart"
 )
 
@@ -77,5 +78,24 @@ func TestTextReportDoesNotClaimHealthyWhenSMARTIsUnavailable(t *testing.T) {
 	report := buildTextReport([]smart.Disk{{Index: 1, Kind: smart.KindATA, Model: "Unavailable"}}, nil)
 	if !strings.Contains(report, "无法得出完整健康结论") || strings.Contains(report, "所有监测指标在安全范围内") {
 		t.Fatalf("unexpected text report conclusion: %q", report)
+	}
+}
+
+func TestReportModelShowsDiskLevelSMARTDiagnostics(t *testing.T) {
+	m := &reportModel{
+		disks: []smart.Disk{{Index: 3, Kind: smart.KindATA, Model: "Failed", Attrs: []smart.Attr{{ID: 5}}}},
+		violations: []health.Violation{
+			{DiskIndex: 3, AttrID: 0, AttrName: "SMART_Overall_Health", Current: "FAILED", Limit: "PASSED", Severity: health.Critical},
+			{DiskIndex: 3, AttrID: -1, AttrName: "SMART_Data_Checksum", Current: "INVALID", Limit: "VALID", Severity: health.Warning},
+		},
+	}
+	if got := m.RowCount(); got != 3 {
+		t.Fatalf("row count = %d, want 3", got)
+	}
+	if got := m.Value(0, 4); got != "SMART_Overall_Health" || m.Value(0, 9) != "❌ 严重" {
+		t.Fatalf("unexpected overall diagnostic row: name=%q status=%q", got, m.Value(0, 9))
+	}
+	if got := m.Value(1, 2); got != "-" || m.Value(1, 4) != "SMART_Data_Checksum" || m.Value(1, 9) != "⚠️ 警告" {
+		t.Fatalf("unexpected checksum diagnostic row: id=%q name=%q status=%q", got, m.Value(1, 4), m.Value(1, 9))
 	}
 }

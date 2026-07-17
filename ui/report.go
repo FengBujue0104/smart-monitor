@@ -132,6 +132,24 @@ func (m *reportModel) build() {
 	}
 	for _, d := range m.disks {
 		dname := fmt.Sprintf("PhysicalDrive%d  %s", d.Index, diskSummary(d))
+		for _, v := range m.violations {
+			if v.DiskIndex != d.Index || v.AttrID > 0 {
+				continue
+			}
+			m.rows = append(m.rows, reportRow{
+				disk:     dname,
+				kind:     string(d.Kind),
+				id:       v.AttrID,
+				flags:    "-",
+				name:     v.AttrName,
+				raw:      "-",
+				current:  v.Current,
+				worst:    "-",
+				limit:    v.Limit,
+				status:   statusForSeverity(v.Severity),
+				severity: v.Severity,
+			})
+		}
 		if len(d.Attrs) == 0 {
 			m.rows = append(m.rows, reportRow{
 				disk:     dname,
@@ -163,18 +181,22 @@ func (m *reportModel) build() {
 				limit:    threshStr(a.Thresh),
 				severity: sev,
 			}
-			switch sev {
-			case "critical":
-				r.status = "❌ 严重"
-			case "warning":
-				r.status = "⚠️ 警告"
-			default:
-				r.status = "✅"
-			}
+			r.status = statusForSeverity(sev)
 			m.rows = append(m.rows, r)
 		}
 	}
 	m.built = true
+}
+
+func statusForSeverity(severity string) string {
+	switch severity {
+	case "critical":
+		return "❌ 严重"
+	case "warning":
+		return "⚠️ 警告"
+	default:
+		return "✅"
+	}
 }
 
 func (m *reportModel) RowCount() int {
