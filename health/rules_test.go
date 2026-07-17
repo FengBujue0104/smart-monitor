@@ -49,6 +49,14 @@ func TestNVMeOverallSMARTFailureCreatesCriticalViolation(t *testing.T) {
 	}
 }
 
+func TestInvalidATASMARTChecksumCreatesWarning(t *testing.T) {
+	d := smart.Disk{Index: 0, Kind: smart.KindATA, SMARTChecksumKnown: true, SMARTChecksumValid: false}
+	got := Evaluate([]smart.Disk{d})
+	if len(got) != 1 || got[0].AttrID != -1 || got[0].Severity != Warning || got[0].AttrName != "SMART_Data_Checksum" {
+		t.Fatalf("expected SMART checksum warning: %+v", got)
+	}
+}
+
 func TestNVMePercentageUsedIsNotFailureAtFiftyPercent(t *testing.T) {
 	for _, value := range []uint64{50, 79} {
 		d := smart.Disk{Index: 0, Kind: smart.KindNVMe, Attrs: []smart.Attr{{

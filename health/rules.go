@@ -48,6 +48,7 @@ func Evaluate(disks []smart.Disk) []Violation {
 	var out []Violation
 	for _, d := range disks {
 		out = append(out, evaluateOverallStatus(d)...)
+		out = append(out, evaluateSMARTDataIntegrity(d)...)
 		switch d.Kind {
 		case smart.KindATA:
 			out = append(out, evaluateATA(d)...)
@@ -56,6 +57,21 @@ func Evaluate(disks []smart.Disk) []Violation {
 		}
 	}
 	return out
+}
+
+func evaluateSMARTDataIntegrity(d smart.Disk) []Violation {
+	if d.Kind != smart.KindATA || !d.SMARTChecksumKnown || d.SMARTChecksumValid {
+		return nil
+	}
+	return []Violation{{
+		DiskIndex: d.Index,
+		DiskModel: d.Model,
+		AttrID:    -1,
+		AttrName:  "SMART_Data_Checksum",
+		Current:   "INVALID",
+		Limit:     "VALID",
+		Severity:  Warning,
+	}}
 }
 
 func evaluateOverallStatus(d smart.Disk) []Violation {
