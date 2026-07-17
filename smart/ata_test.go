@@ -38,3 +38,18 @@ func TestReadSMARTDataKeepsStandardHeaderWhenFirstSlotIsEmpty(t *testing.T) {
 		t.Fatalf("unexpected attributes with empty first slot: %+v", attrs)
 	}
 }
+
+func TestParseSMARTDriverStatus(t *testing.T) {
+	out := make([]byte, 16)
+	if err := parseSMARTDriverStatus(out); err != nil {
+		t.Fatalf("unexpected successful status error: %v", err)
+	}
+	out[4] = 1
+	if err := parseSMARTDriverStatus(out); err == nil {
+		t.Fatal("expected driver error")
+	}
+	out[4], out[5] = 0, 0x51
+	if err := parseSMARTDriverStatus(out); err == nil {
+		t.Fatal("expected IDE error")
+	}
+}

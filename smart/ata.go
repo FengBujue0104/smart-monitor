@@ -163,8 +163,11 @@ func issueSmartCommand(h windows.Handle, cmd, sub, driveNum byte) ([]byte, error
 	// 输出结构：SENDCMDOUTPARAMS = cBufferSize(4) + DriverStatus{bDriverError,bIDEError,bReserved[2],dwReserved[2]}(12) = 16 字节头
 	// 然后紧跟 512 字节数据缓冲区。故总返回 = 16 + 512 = 528。
 	const outHdrSize = 16
-	if bytesReturned < uint32(outHdrSize+12) {
+	if bytesReturned < uint32(outHdrSize+512) {
 		return nil, fmt.Errorf("SMART_RCV 返回过短: got=%d", bytesReturned)
+	}
+	if err := parseSMARTDriverStatus(outBuf); err != nil {
+		return nil, fmt.Errorf("SMART_RCV_DRIVE_DATA cmd=0x%02X: %w", cmd, err)
 	}
 	dataLen := bytesReturned - outHdrSize
 	if dataLen > 512 {
@@ -173,6 +176,16 @@ func issueSmartCommand(h windows.Handle, cmd, sub, driveNum byte) ([]byte, error
 	data := make([]byte, 512)
 	copy(data, outBuf[outHdrSize:outHdrSize+dataLen])
 	return data, nil
+}
+
+func parseSMARTDriverStatus(out []byte) error {
+	if len(out) < 6 {
+		return fmt.Errorf("output header too short")
+	}
+	if out[4] != 0 || out[5] != 0 {
+		return fmt.Errorf("driver error=0x%02X ide error=0x%02X", out[4], out[5])
+	}
+	return nil
 }
 
 // ReadIdentify 读取 ATA IDENTIFY DEVICE（512 字节）。
