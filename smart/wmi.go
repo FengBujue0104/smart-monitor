@@ -25,6 +25,11 @@ type wmiFailurePredictThresholds struct {
 	VendorSpecific []byte // 2 字节头 + 30×12 字节，每记录 byte[1]=阈值
 }
 
+type wmiFailurePredictStatus struct {
+	InstanceName   string
+	PredictFailure bool
+}
+
 // wmiDiskDrive 对应 Win32_DiskDrive。
 type wmiDiskDrive struct {
 	Index            uint32
@@ -60,6 +65,11 @@ func DiscoverWMI() ([]Disk, error) {
 	q3 := wmi.CreateQuery(&thresholds, "", "MSStorageDriver_FailurePredictThresholds")
 	_ = wmi.QueryNamespace(q3, &thresholds, `root\WMI`) // 阈值可选，失败不阻塞
 
+	// 4. 读取 WMI 提供的 SMART overall failure 状态。
+	var statuses []wmiFailurePredictStatus
+	q4 := wmi.CreateQuery(&statuses, "", "MSStorageDriver_FailurePredictStatus")
+	_ = wmi.QueryNamespace(q4, &statuses, `root\WMI`) // 部分控制器没有该类，状态可未知
+
 	// 建立 InstanceName -> data 映射
 	dataMap := map[string][]byte{}
 	for _, d := range smartData {
@@ -68,6 +78,10 @@ func DiscoverWMI() ([]Disk, error) {
 	threshMap := map[string][]byte{}
 	for _, t := range thresholds {
 		threshMap[t.InstanceName] = t.VendorSpecific
+	}
+	statusMap := map[string]bool{}
+	for _, s := range statuses {
+		statusMap[s.InstanceName] = s.PredictFailure
 	}
 
 	var disks []Disk
@@ -92,6 +106,10 @@ func DiscoverWMI() ([]Disk, error) {
 		if strings.Contains(strings.ToLower(drv.InterfaceType), "nvme") || strings.Contains(strings.ToLower(instanceName), "nvme") {
 			d.Kind = KindNVMe
 		}
+		if predictFailure, ok := findStatusForDrive(statusMap, drv); ok {
+			d.SmartStatusKnown = true
+			d.SmartStatusPassed = !predictFailure
+		}
 		if d.Kind == KindATA && len(data) >= 14 {
 			attrs := parseWMIAttributes(data)
 			// 阈值
@@ -107,6 +125,29 @@ func DiscoverWMI() ([]Disk, error) {
 		disks = append(disks, d)
 	}
 	return disks, nil
+}
+
+func findStatusForDrive(m map[string]bool, drv wmiDiskDrive) (bool, bool) {
+	pnp := strings.ToLower(strings.ReplaceAll(cleanWMIString(drv.PNPDeviceID), " ", ""))
+	model := strings.ToLower(cleanWMIString(drv.Model))
+	serial := strings.ToLower(cleanWMIString(drv.SerialNumber))
+	var modelMatches []bool
+	for name, predictFailure := range m {
+		n := strings.ToLower(name)
+		if pnp != "" && strings.Contains(strings.ReplaceAll(n, " ", ""), pnp) {
+			return predictFailure, true
+		}
+		if serial != "" && strings.Contains(n, serial) {
+			return predictFailure, true
+		}
+		if model != "" && strings.Contains(n, model) {
+			modelMatches = append(modelMatches, predictFailure)
+		}
+	}
+	if len(modelMatches) == 1 {
+		return modelMatches[0], true
+	}
+	return false, false
 }
 
 // findDataForDriveOK 返回 ([]byte, bool)。

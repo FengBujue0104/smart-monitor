@@ -26,3 +26,24 @@ func TestFindDataForDriveDoesNotReuseUnmatchedData(t *testing.T) {
 		t.Fatalf("unexpected fallback match: data=%v instance=%q", data, instance)
 	}
 }
+
+func TestFindStatusForDriveUsesUniqueDeviceMatch(t *testing.T) {
+	m := map[string]bool{
+		"SCSI\\Disk&Ven_A&Prod_DriveA\\1": true,
+	}
+	drv := wmiDiskDrive{Model: "DriveA", SerialNumber: "serial-a"}
+	predictFailure, ok := findStatusForDrive(m, drv)
+	if !ok || !predictFailure {
+		t.Fatalf("expected matching failure status, got status=%v ok=%v", predictFailure, ok)
+	}
+}
+
+func TestFindStatusForDriveRejectsAmbiguousModel(t *testing.T) {
+	m := map[string]bool{
+		"SCSI\\Disk&Ven_A&Prod_Same\\1": true,
+		"SCSI\\Disk&Ven_A&Prod_Same\\2": false,
+	}
+	if _, ok := findStatusForDrive(m, wmiDiskDrive{Model: "Same"}); ok {
+		t.Fatal("ambiguous model should not produce a status")
+	}
+}
