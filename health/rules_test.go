@@ -82,3 +82,13 @@ func TestNVMeCountersDoNotOverflowWhenReported(t *testing.T) {
 		t.Fatalf("unexpected media error count: %+v", got)
 	}
 }
+
+func TestNVMeMediaErrorsWithNonZeroHighHalfAreCritical(t *testing.T) {
+	d := smart.Disk{Index: 0, Kind: smart.KindNVMe, Attrs: []smart.Attr{{
+		ID: smart.NVMeMediaErrors, Raw: 0, RawHigh: 1,
+	}}}
+	got := Evaluate([]smart.Disk{d})
+	if len(got) != 1 || got[0].Current != "0x00000000000000010000000000000000" {
+		t.Fatalf("unexpected 128-bit media error violation: %+v", got)
+	}
+}

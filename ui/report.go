@@ -259,9 +259,11 @@ func attrRawStr(a smart.Attr) string {
 			}
 			return fmt.Sprintf("%.2f TB (0x%016X%016X units)", units*512000.0/1e12, a.RawHigh, a.Raw)
 		case smart.NVMePowerOnHours:
-			return fmt.Sprintf("%d h", a.Raw)
+			return nvmeCounterStr(a) + " h"
 		case smart.NVMeWarningTempTime, smart.NVMeCriticalTempTime:
 			return fmt.Sprintf("%d min", a.Raw)
+		case smart.NVMeMediaErrors, smart.NVMePowerCycles, smart.NVMeUnsafeShutdowns, smart.NVMeErrorInfoEntries:
+			return nvmeCounterStr(a)
 		}
 		if a.ID >= smart.NVMeTemperatureSensor1 && a.ID <= smart.NVMeTemperatureSensor8 {
 			return fmt.Sprintf("%d°C", int(a.Raw)-273)
@@ -283,6 +285,13 @@ func attrRawStr(a smart.Attr) string {
 		return fmt.Sprintf("%d", a.Raw)
 	}
 	return fmt.Sprintf("%d", a.Raw)
+}
+
+func nvmeCounterStr(a smart.Attr) string {
+	if a.RawHigh == 0 {
+		return fmt.Sprintf("%d", a.Raw)
+	}
+	return fmt.Sprintf("0x%016X%016X", a.RawHigh, a.Raw)
 }
 
 func diskSummary(d smart.Disk) string {

@@ -1,6 +1,7 @@
 package health
 
 import (
+	"fmt"
 	"strconv"
 
 	"smonitor/smart"
@@ -149,8 +150,8 @@ func evaluateNVMe(d smart.Disk) []Violation {
 	for _, a := range d.Attrs {
 		switch a.ID {
 		case smart.NVMeMediaErrors:
-			if a.Raw != 0 {
-				add(a, Critical, u64s(a.Raw), "= 0")
+			if a.Raw != 0 || a.RawHigh != 0 {
+				add(a, Critical, u128s(a.Raw, a.RawHigh), "= 0")
 			}
 		case smart.NVMePercentUsed:
 			if a.Raw >= 100 {
@@ -199,3 +200,10 @@ func u64s(v uint64) string {
 	return strconv.FormatUint(v, 10)
 }
 func its(v int) string { return strconv.Itoa(v) }
+
+func u128s(low, high uint64) string {
+	if high == 0 {
+		return u64s(low)
+	}
+	return fmt.Sprintf("0x%016X%016X", high, low)
+}

@@ -31,6 +31,11 @@ func TestAttrDisplaySeparatesRawAndNormalizedValues(t *testing.T) {
 	if got := attrRawStr(nvmeWrite); !strings.Contains(got, "0.51 TB") || !strings.Contains(got, "1000000 units") {
 		t.Fatalf("unexpected NVMe data unit display: %q", got)
 	}
+
+	nvmeHighCounter := smart.Attr{ID: smart.NVMeMediaErrors, RawHigh: 1, Kind: "nvme"}
+	if got := attrRawStr(nvmeHighCounter); got != "0x00000000000000010000000000000000" {
+		t.Fatalf("unexpected 128-bit NVMe counter display: %q", got)
+	}
 }
 
 func TestDiskSummaryIncludesCapacityAndReadState(t *testing.T) {
