@@ -82,6 +82,34 @@ func TestApplyWMIATADataChecksSMARTChecksum(t *testing.T) {
 	}
 }
 
+func TestApplyWMIATADataRejectsInvalidThresholdChecksum(t *testing.T) {
+	data := make([]byte, 512)
+	data[0], data[2], data[5] = 1, 0x05, 100
+	setSMARTPageChecksum(data)
+	thresholds := make([]byte, 512)
+	thresholds[0], thresholds[2], thresholds[3] = 1, 0x05, 36
+	setSMARTPageChecksum(thresholds)
+
+	d := Disk{Model: "Test"}
+	applyWMIATAData(&d, data, thresholds)
+	if len(d.Attrs) != 1 || d.Attrs[0].Thresh != 36 || !d.SMARTThresholdChecksumKnown || !d.SMARTThresholdChecksumValid {
+		t.Fatalf("unexpected valid WMI thresholds: %+v", d)
+	}
+
+	thresholds[10]++
+	applyWMIATAData(&d, data, thresholds)
+	if d.Attrs[0].Thresh != 0 || d.SMARTThresholdChecksumValid {
+		t.Fatalf("invalid WMI thresholds should be ignored: %+v", d)
+	}
+}
+
+func setSMARTPageChecksum(data []byte) {
+	data[511] = 0
+	for _, b := range data[:511] {
+		data[511] -= b
+	}
+}
+
 func TestClassifyWMIDiskDetectsNVMeWithoutSMARTDataInstance(t *testing.T) {
 	drv := wmiDiskDrive{PNPDeviceID: `SCSI\Disk&Ven_NVMe&Prod_SSD\1`}
 	if got := classifyWMIDisk(drv, ""); got != KindNVMe {

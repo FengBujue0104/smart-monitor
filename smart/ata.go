@@ -313,11 +313,24 @@ func smartTableBase(data []byte) int {
 
 // ReadSMARTThresholds 读取属性阈值页。
 func ReadSMARTThresholds(h windows.Handle, driveNum byte) (map[int]int, error) {
-	data, err := issueSmartCommand(h, ATA_CMD_SMART, SMART_READ_THRESHOLDS, driveNum)
+	thresholds, checksumValid, err := ReadSMARTThresholdsDetailed(h, driveNum)
 	if err != nil {
 		return nil, err
 	}
-	return parseSMARTThresholds(data), nil
+	if !checksumValid {
+		return nil, fmt.Errorf("ATA SMART threshold checksum invalid")
+	}
+	return thresholds, nil
+}
+
+// ReadSMARTThresholdsDetailed reads the ATA threshold page and reports whether
+// its 512-byte SMART checksum is valid.
+func ReadSMARTThresholdsDetailed(h windows.Handle, driveNum byte) (map[int]int, bool, error) {
+	data, err := issueSmartCommand(h, ATA_CMD_SMART, SMART_READ_THRESHOLDS, driveNum)
+	if err != nil {
+		return nil, false, err
+	}
+	return parseSMARTThresholds(data), smartChecksumValid(data), nil
 }
 
 func parseSMARTThresholds(data []byte) map[int]int {

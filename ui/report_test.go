@@ -61,6 +61,13 @@ func TestDiskSummaryShowsChecksumWarning(t *testing.T) {
 	}
 }
 
+func TestDiskSummaryShowsThresholdChecksumWarning(t *testing.T) {
+	d := smart.Disk{Model: "Test HDD", SMARTThresholdChecksumKnown: true, SMARTThresholdChecksumValid: false, Attrs: []smart.Attr{{ID: 1}}}
+	if got := diskSummary(d); !strings.Contains(got, "校验和异常") || smartThresholdChecksumText(d) != "异常" {
+		t.Fatalf("unexpected threshold checksum summary: %q", got)
+	}
+}
+
 func TestReportModelShowsDiskWhenSMARTDataIsUnavailable(t *testing.T) {
 	m := &reportModel{disks: []smart.Disk{{Index: 4, Kind: smart.KindATA, Model: "Unavailable"}}}
 	if got := m.RowCount(); got != 1 {

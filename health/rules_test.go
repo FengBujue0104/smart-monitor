@@ -57,6 +57,14 @@ func TestInvalidATASMARTChecksumCreatesWarning(t *testing.T) {
 	}
 }
 
+func TestInvalidATASMARTThresholdChecksumCreatesWarning(t *testing.T) {
+	d := smart.Disk{Index: 0, Kind: smart.KindATA, SMARTThresholdChecksumKnown: true, SMARTThresholdChecksumValid: false}
+	got := Evaluate([]smart.Disk{d})
+	if len(got) != 1 || got[0].AttrID != -2 || got[0].Severity != Warning || got[0].AttrName != "SMART_Threshold_Checksum" {
+		t.Fatalf("expected SMART threshold checksum warning: %+v", got)
+	}
+}
+
 func TestGenericATAThresholdUsesPreFailSeverity(t *testing.T) {
 	tests := []struct {
 		name  string

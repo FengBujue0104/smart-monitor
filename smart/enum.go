@@ -205,8 +205,12 @@ func Discover() ([]Disk, error) {
 			} else {
 				d.SMARTChecksumKnown = true
 				d.SMARTChecksumValid = checksumValid
-				th, thErr := ReadSMARTThresholds(h, byte(i))
+				th, thresholdChecksumValid, thErr := ReadSMARTThresholdsDetailed(h, byte(i))
 				if thErr == nil {
+					d.SMARTThresholdChecksumKnown = true
+					d.SMARTThresholdChecksumValid = thresholdChecksumValid
+				}
+				if thErr == nil && thresholdChecksumValid {
 					for i := range attrs {
 						if t, ok := th[attrs[i].ID]; ok {
 							attrs[i].Thresh = t

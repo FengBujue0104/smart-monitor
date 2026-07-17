@@ -123,7 +123,13 @@ func classifyWMIDisk(drv wmiDiskDrive, instanceName string) DiskKind {
 
 func applyWMIATAData(d *Disk, data, thresholds []byte) {
 	attrs := parseWMIAttributes(data)
-	if len(thresholds) >= 14 {
+	thresholdsValid := true
+	if len(thresholds) >= 512 {
+		d.SMARTThresholdChecksumKnown = true
+		thresholdsValid = smartChecksumValid(thresholds)
+		d.SMARTThresholdChecksumValid = thresholdsValid
+	}
+	if len(thresholds) >= 14 && thresholdsValid {
 		applyThresholds(attrs, thresholds)
 	}
 	for i := range attrs {

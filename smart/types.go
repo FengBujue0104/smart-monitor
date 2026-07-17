@@ -64,8 +64,10 @@ type Disk struct {
 	SmartStatusKnown  bool // 是否成功读取整体 SMART status
 	SmartStatusPassed bool // 整体 SMART status 是否通过
 	// ATA 特有
-	SMARTChecksumKnown bool // 是否检查了 ATA SMART 数据 checksum
-	SMARTChecksumValid bool // ATA SMART 数据 checksum 是否有效
+	SMARTChecksumKnown          bool // 是否检查了 ATA SMART 数据 checksum
+	SMARTChecksumValid          bool // ATA SMART 数据 checksum 是否有效
+	SMARTThresholdChecksumKnown bool // 是否检查了 ATA SMART 阈值页 checksum
+	SMARTThresholdChecksumValid bool // ATA SMART 阈值页 checksum 是否有效
 	// NVMe 特有
 	NVMeCriticalSpareBelow bool
 	NVMeReadOnlyMode       bool

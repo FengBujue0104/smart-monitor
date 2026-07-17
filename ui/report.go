@@ -326,14 +326,14 @@ func diskSummary(d smart.Disk) string {
 	}
 	if d.SmartStatusKnown {
 		if d.SmartStatusPassed {
-			if d.SMARTChecksumKnown && !d.SMARTChecksumValid {
+			if hasInvalidATASMARTChecksum(d) {
 				return summary + " [SMART通过/校验和异常]"
 			}
 			return summary + " [SMART通过]"
 		}
 		return summary + " [SMART失败]"
 	}
-	if d.SMARTChecksumKnown && !d.SMARTChecksumValid {
+	if hasInvalidATASMARTChecksum(d) {
 		return summary + " [SMART校验和异常]"
 	}
 	return summary + " [SMART数据已读取]"
@@ -357,6 +357,21 @@ func smartChecksumText(d smart.Disk) string {
 		return "有效"
 	}
 	return "异常"
+}
+
+func smartThresholdChecksumText(d smart.Disk) string {
+	if !d.SMARTThresholdChecksumKnown {
+		return "未知"
+	}
+	if d.SMARTThresholdChecksumValid {
+		return "有效"
+	}
+	return "异常"
+}
+
+func hasInvalidATASMARTChecksum(d smart.Disk) bool {
+	return (d.SMARTChecksumKnown && !d.SMARTChecksumValid) ||
+		(d.SMARTThresholdChecksumKnown && !d.SMARTThresholdChecksumValid)
 }
 
 func attrCurrentStr(a smart.Attr) string {
