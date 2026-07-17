@@ -47,6 +47,12 @@ func main() {
 			walk.MsgBox(nil, "扫描失败", fmt.Sprintf("枚举磁盘失败: %v", err), walk.MsgBoxIconError)
 			os.Exit(2)
 		}
+	} else if hasMissingSMART(disks) {
+		// IOCTL 可能只对部分控制器成功；按 PhysicalDrive 编号用 WMI 补齐缺失盘，
+		// 不覆盖已经成功读取的属性。
+		if fallback, wmiErr := smart.DiscoverWMI(); wmiErr == nil {
+			disks = mergeFallbackDisks(disks, fallback)
+		}
 	}
 	if len(disks) == 0 {
 		walk.MsgBox(nil, "未发现磁盘", "未找到任何物理磁盘。", walk.MsgBoxIconInformation)
@@ -58,6 +64,39 @@ func main() {
 		log.Printf("UI error: %v", err)
 		os.Exit(3)
 	}
+}
+
+func hasMissingSMART(disks []smart.Disk) bool {
+	for _, d := range disks {
+		if len(d.Attrs) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func mergeFallbackDisks(primary, fallback []smart.Disk) []smart.Disk {
+	byIndex := make(map[int]smart.Disk, len(fallback))
+	for _, d := range fallback {
+		byIndex[d.Index] = d
+	}
+	seen := make(map[int]bool, len(primary))
+	result := make([]smart.Disk, 0, len(primary)+len(fallback))
+	for _, d := range primary {
+		seen[d.Index] = true
+		if len(d.Attrs) == 0 {
+			if f, ok := byIndex[d.Index]; ok && len(f.Attrs) > 0 && f.Kind == d.Kind {
+				d.Attrs = f.Attrs
+			}
+		}
+		result = append(result, d)
+	}
+	for _, d := range fallback {
+		if !seen[d.Index] {
+			result = append(result, d)
+		}
+	}
+	return result
 }
 
 // isAdmin 简单检测：尝试打开 \\.\PhysicalDrive0；失败则视为无权限。

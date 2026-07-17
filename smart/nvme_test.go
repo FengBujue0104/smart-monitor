@@ -7,21 +7,21 @@ import (
 
 func TestBuildNVMeGetLogPageUsesProtocolCommandLayout(t *testing.T) {
 	buf := buildNVMeGetLogPage(NVMeLogID_SMART_Health, 512)
-	if len(buf) != 640 {
-		t.Fatalf("got buffer length %d, want 640", len(buf))
+	if len(buf) != 656 {
+		t.Fatalf("got buffer length %d, want 656", len(buf))
 	}
 	if binary.LittleEndian.Uint32(buf[0x00:0x04]) != 1 ||
-		binary.LittleEndian.Uint32(buf[0x04:0x08]) != 56 ||
+		binary.LittleEndian.Uint32(buf[0x04:0x08]) != 80 ||
 		binary.LittleEndian.Uint32(buf[0x08:0x0C]) != STORAGE_PROTOCOL_TYPE_NVMe {
 		t.Fatalf("invalid protocol header: %x", buf[:16])
 	}
-	if buf[56] != NVMeGetLogPage {
-		t.Fatalf("got opcode 0x%02x, want 0x02", buf[56])
+	if buf[80] != NVMeGetLogPage {
+		t.Fatalf("got opcode 0x%02x, want 0x02", buf[80])
 	}
-	if got := binary.LittleEndian.Uint32(buf[96:100]); got != (127<<16)|NVMeLogID_SMART_Health {
+	if got := binary.LittleEndian.Uint32(buf[120:124]); got != (127<<16)|NVMeLogID_SMART_Health {
 		t.Fatalf("got CDW10 0x%08x", got)
 	}
-	if binary.LittleEndian.Uint32(buf[0x24:0x28]) != 128 {
+	if binary.LittleEndian.Uint32(buf[0x34:0x38]) != 144 {
 		t.Fatalf("invalid data offset")
 	}
 }

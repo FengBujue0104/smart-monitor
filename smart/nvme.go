@@ -10,7 +10,7 @@ import (
 
 // ===== NVMe 结构体（NVMe Base Spec 1.4/2.0）=====
 
-// STORAGE_PROTOCOL_COMMAND 的固定部分为 56 字节，后面是 64 字节 NVMe 命令。
+// STORAGE_PROTOCOL_COMMAND 的固定部分为 80 字节，后面是 64 字节 NVMe 命令。
 // 数据缓冲区通过 DataFromDeviceBufferOffset 指定，不能简单按「头 + 数据」拼接。
 
 const (
@@ -23,9 +23,9 @@ const (
 // 返回 [命令头][数据缓冲区] 拼接后的字节。
 func buildNVMeGetLogPage(logID uint8, lenBytes int) []byte {
 	const (
-		protocolHeaderSize = 56
-		commandOffset      = 56
-		dataOffset         = 128
+		protocolHeaderSize = 80
+		commandOffset      = 80
+		dataOffset         = 144
 		commandLength      = 64
 	)
 	if lenBytes <= 0 || lenBytes%4 != 0 {
@@ -37,9 +37,10 @@ func buildNVMeGetLogPage(logID uint8, lenBytes int) []byte {
 	binary.LittleEndian.PutUint32(buf[0x04:0x08], protocolHeaderSize)
 	binary.LittleEndian.PutUint32(buf[0x08:0x0C], STORAGE_PROTOCOL_TYPE_NVMe)
 	binary.LittleEndian.PutUint32(buf[0x18:0x1C], commandLength)
-	binary.LittleEndian.PutUint32(buf[0x20:0x24], uint32(lenBytes)) // DataFromDeviceTransferLength
-	binary.LittleEndian.PutUint32(buf[0x24:0x28], dataOffset)       // DataFromDeviceBufferOffset
-	binary.LittleEndian.PutUint32(buf[0x30:0x34], 10)               // TimeoutValue
+	binary.LittleEndian.PutUint32(buf[0x24:0x28], uint32(lenBytes)) // DataFromDeviceTransferLength
+	binary.LittleEndian.PutUint32(buf[0x34:0x38], dataOffset)       // DataFromDeviceBufferOffset
+	binary.LittleEndian.PutUint32(buf[0x28:0x2C], 10)               // TimeoutValue
+	binary.LittleEndian.PutUint32(buf[0x38:0x3C], STORAGE_PROTOCOL_SPECIFIC_NVME_ADMIN_COMMAND)
 
 	// NVMe Get Log Page command. CDW10 contains NUMDL and LID.
 	buf[commandOffset] = NVMeGetLogPage
@@ -70,7 +71,7 @@ func issueNVMeGetLogPage(h windows.Handle, logID uint8) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("IOCTL_STORAGE_PROTOCOL_COMMAND logID=0x%02X err=%w", logID, err)
 	}
-	const dataOffset = 128
+	const dataOffset = 144
 	if bytesReturned < uint32(dataOffset+512) {
 		return nil, fmt.Errorf("NVMe 返回过短: got=%d", bytesReturned)
 	}

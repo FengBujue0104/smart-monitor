@@ -92,7 +92,7 @@ func DiscoverWMI() ([]Disk, error) {
 		if strings.Contains(strings.ToLower(drv.InterfaceType), "nvme") || strings.Contains(strings.ToLower(instanceName), "nvme") {
 			d.Kind = KindNVMe
 		}
-		if len(data) >= 14 {
+		if d.Kind == KindATA && len(data) >= 14 {
 			attrs := parseWMIAttributes(data)
 			// 阈值
 			th, ok := findDataForDriveOK(threshMap, drv)
