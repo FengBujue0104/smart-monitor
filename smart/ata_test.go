@@ -22,3 +22,18 @@ func TestReadSMARTDataUsesStandardHeader(t *testing.T) {
 		t.Fatalf("unexpected attribute: %+v", attrs[0])
 	}
 }
+
+func TestReadSMARTDataKeepsStandardHeaderWhenFirstSlotIsEmpty(t *testing.T) {
+	data := make([]byte, 512)
+	data[0] = 1
+	off := 2 + 12
+	data[off] = 0xC2
+	data[off+3] = 100
+	data[off+4] = 90
+	data[off+5] = 42
+
+	attrs := parseSMARTData(data)
+	if len(attrs) != 1 || attrs[0].ID != 0xC2 || attrs[0].Raw != 42 {
+		t.Fatalf("unexpected attributes with empty first slot: %+v", attrs)
+	}
+}

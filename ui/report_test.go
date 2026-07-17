@@ -8,8 +8,8 @@ import (
 )
 
 func TestAttrDisplaySeparatesRawAndNormalizedValues(t *testing.T) {
-	ataTemp := smart.Attr{ID: 0xC2, Raw: 42, Value: 100, Worst: 90, Kind: "ata"}
-	if got := attrRawStr(ataTemp); got != "42°C (raw 42)" {
+	ataTemp := smart.Attr{ID: 0xC2, Raw: 0x46302A, Value: 100, Worst: 90, Kind: "ata"}
+	if got := attrRawStr(ataTemp); got != "42°C (min 48°C, max 70°C)" {
 		t.Fatalf("unexpected ATA raw display: %q", got)
 	}
 	if got := attrCurrentStr(ataTemp); got != "100" || attrWorstStr(ataTemp) != "90" {

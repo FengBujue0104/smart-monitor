@@ -147,18 +147,16 @@ func ReadSMARTData(h windows.Handle, driveNum byte) ([]Attr, bool, error) {
 }
 
 func parseSMARTData(data []byte) []Attr {
+	if len(data) < 2 {
+		return nil
+	}
+	base := smartTableBase(data)
 	var attrs []Attr
 	for i := 0; i < 30; i++ {
 		// 标准 SMART 属性表：2 字节版本头 + 30 × 12 字节属性。
 		// 某些 AHCI 驱动不带版本表头（从偏移 0 开始），需启发式识别：
 		//   若 data[0] 为 0 且 data[2] 是有效属性 ID（1..0xC7），则表头为 2 字节；
 		//   否则可能从偏移 0 开始。
-		// 标准 SMART 返回值的前两个字节是版本号，例如 01 00。
-		// 只有标准表头位置没有属性而偏移 0 有有效 ID 时，才兼容无表头驱动。
-		base := 2
-		if data[2] == 0 && data[0] >= 1 && data[0] <= 0xFF {
-			base = 0
-		}
 		off := base + i*12
 		if off+12 > len(data) {
 			break
@@ -186,6 +184,29 @@ func parseSMARTData(data []byte) []Attr {
 		})
 	}
 	return attrs
+}
+
+// smartTableBase chooses the standard two-byte header unless the complete
+// table only makes sense when interpreted as a headerless vendor response.
+func smartTableBase(data []byte) int {
+	count := func(base int) int {
+		count := 0
+		for i := 0; i < 30; i++ {
+			off := base + i*12
+			if off+12 > len(data) {
+				break
+			}
+			id, value, worst := data[off], data[off+3], data[off+4]
+			if id != 0 && value <= 253 && worst <= 253 {
+				count++
+			}
+		}
+		return count
+	}
+	if count(2) > 0 || count(0) == 0 {
+		return 2
+	}
+	return 0
 }
 
 // ReadSMARTThresholds 读取属性阈值页。
