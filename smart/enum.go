@@ -29,10 +29,11 @@ type storagePropertyQuery struct {
 // 实际是一个变长结构：头 + VendorID/ProductID/ProductRevision/SerialNumber 偏移 + 字符串。
 // 头部长 36 字节（Windows SDK），随后 4 个偏移，再 1 字节 DeviceType/DeviceTypeModifier，+ 1 字节 Removable/CommandQueueing，再 + 字符串。
 const (
-	StorageDeviceProperty  = 0
-	StorageAdapterProperty = 1
-	PropertyStandardQuery  = 0
-	maxPhysDrives          = 32
+	StorageDeviceProperty      = 0
+	StorageAdapterProperty     = 1
+	PropertyStandardQuery      = 0
+	IOCTL_DISK_GET_LENGTH_INFO = 0x0007405C
+	maxPhysDrives              = 32
 )
 
 // queryStorageDevice 发 IOCTL_STORAGE_QUERY_PROPERTY，返回原始描述符字节。
@@ -57,6 +58,17 @@ func queryStorageDevice(h windows.Handle) ([]byte, error) {
 		return nil, err
 	}
 	return out[:returned], nil
+}
+
+func queryDiskSizeGB(h windows.Handle) float64 {
+	out := make([]byte, 8)
+	var returned uint32
+	if err := windows.DeviceIoControl(h, IOCTL_DISK_GET_LENGTH_INFO, nil, 0,
+		&out[0], uint32(len(out)), &returned, nil); err != nil || returned < 8 {
+		return 0
+	}
+	bytes := binary.LittleEndian.Uint64(out)
+	return float64(bytes) / (1024 * 1024 * 1024)
 }
 
 // parseStorageDescriptor 从 STORAGE_DEVICE_DESCRIPTOR 输出中解析型号/序列号/固件/容量。
@@ -151,6 +163,7 @@ func Discover() ([]Disk, error) {
 			Serial:   serial,
 			Firmware: revision,
 		}
+		d.SizeGB = queryDiskSizeGB(h)
 
 		switch {
 		case busType == 0x11: // NVMe

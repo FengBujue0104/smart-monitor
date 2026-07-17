@@ -129,7 +129,7 @@ func (m *reportModel) build() {
 		}
 	}
 	for _, d := range m.disks {
-		dname := fmt.Sprintf("PhysicalDrive%d  %s", d.Index, d.Model)
+		dname := fmt.Sprintf("PhysicalDrive%d  %s", d.Index, diskSummary(d))
 		for _, a := range d.Attrs {
 			k := [2]int{d.Index, a.ID}
 			sev := vmap[k]
@@ -249,6 +249,17 @@ func attrRawStr(a smart.Attr) string {
 		return fmt.Sprintf("%d", a.Raw)
 	}
 	return fmt.Sprintf("%d", a.Raw)
+}
+
+func diskSummary(d smart.Disk) string {
+	summary := d.Model
+	if d.SizeGB > 0 {
+		summary = fmt.Sprintf("%s (%.0f GB)", summary, d.SizeGB)
+	}
+	if len(d.Attrs) == 0 {
+		return summary + " [SMART未读取]"
+	}
+	return summary + " [SMART数据已读取]"
 }
 
 func attrCurrentStr(a smart.Attr) string {

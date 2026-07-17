@@ -29,3 +29,11 @@ func TestAttrDisplaySeparatesRawAndNormalizedValues(t *testing.T) {
 		t.Fatalf("unexpected NVMe data unit display: %q", got)
 	}
 }
+
+func TestDiskSummaryIncludesCapacityAndReadState(t *testing.T) {
+	d := smart.Disk{Model: "Test SSD", SizeGB: 1024, Attrs: []smart.Attr{{ID: 1}}}
+	got := diskSummary(d)
+	if !strings.Contains(got, "1024 GB") || !strings.Contains(got, "SMART数据已读取") {
+		t.Fatalf("unexpected disk summary: %q", got)
+	}
+}
