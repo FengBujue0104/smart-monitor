@@ -217,13 +217,7 @@ func evaluateNVMe(d smart.Disk) []Violation {
 				add(a, Warning, u64s(a.Raw)+"% used", "< 80%")
 			}
 		case smart.NVMeTemperature:
-			k := a.Raw
-			c := int(k) - 273
-			if k > 333 {
-				add(a, Critical, its(c)+"°C", "≤ 60°C")
-			} else if k > 328 {
-				add(a, Warning, its(c)+"°C", "≤ 55°C")
-			}
+			addNVMeTemperatureViolation(add, a)
 		case smart.NVMeCriticalWarning:
 			if a.Raw != 0 {
 				add(a, Critical, nvmeCriticalWarningText(a.Raw), "= 0")
@@ -233,6 +227,10 @@ func evaluateNVMe(d smart.Disk) []Violation {
 		case smart.NVMeReadOnly:
 			if a.Raw != 0 {
 				add(a, Critical, "ReadOnly", "ReadWrite")
+			}
+		default:
+			if a.ID >= smart.NVMeTemperatureSensor1 && a.ID <= smart.NVMeTemperatureSensor8 {
+				addNVMeTemperatureViolation(add, a)
 			}
 		}
 	}
@@ -250,6 +248,16 @@ func evaluateNVMe(d smart.Disk) []Violation {
 		add(*spare, Critical, u64s(spare.Raw)+"%", "≥ "+u64s(spareThresh.Raw)+"%")
 	}
 	return vs
+}
+
+func addNVMeTemperatureViolation(add func(smart.Attr, Severity, string, string), a smart.Attr) {
+	k := a.Raw
+	c := int(k) - 273
+	if k > 333 {
+		add(a, Critical, its(c)+"°C", "≤ 60°C")
+	} else if k > 328 {
+		add(a, Warning, its(c)+"°C", "≤ 55°C")
+	}
 }
 
 // 小工具

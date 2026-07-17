@@ -119,6 +119,16 @@ func TestNVMeSpareUsesDeviceThreshold(t *testing.T) {
 	}
 }
 
+func TestNVMeTemperatureSensorOverheatCreatesViolation(t *testing.T) {
+	d := smart.Disk{Index: 0, Kind: smart.KindNVMe, Attrs: []smart.Attr{{
+		ID: smart.NVMeTemperatureSensor1, Name: "Temperature_Sensor_1_Kelvin", Raw: 334,
+	}}}
+	got := Evaluate([]smart.Disk{d})
+	if len(got) != 1 || got[0].Severity != Critical || got[0].Current != "61°C" {
+		t.Fatalf("expected critical sensor temperature violation: %+v", got)
+	}
+}
+
 func TestNVMeCriticalWarningIsFormattedAsHex(t *testing.T) {
 	d := smart.Disk{Index: 0, Kind: smart.KindNVMe, Attrs: []smart.Attr{{
 		ID: smart.NVMeCriticalWarning, Raw: 0x10,
