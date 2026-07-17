@@ -52,6 +52,12 @@ func Evaluate(disks []smart.Disk) []Violation {
 		out = append(out, evaluateSMARTDataIntegrity(d)...)
 		switch d.Kind {
 		case smart.KindATA:
+			// A failed data-page checksum means the attribute bytes cannot be
+			// trusted. Keep the independent overall-status and integrity
+			// diagnostics above, but do not turn corrupt values into failures.
+			if d.SMARTChecksumKnown && !d.SMARTChecksumValid {
+				continue
+			}
 			out = append(out, evaluateATA(d)...)
 		case smart.KindNVMe:
 			out = append(out, evaluateNVMe(d)...)

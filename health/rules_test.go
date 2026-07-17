@@ -68,6 +68,17 @@ func TestInvalidATASMARTChecksumCreatesWarning(t *testing.T) {
 	}
 }
 
+func TestInvalidATASMARTChecksumSuppressesUntrustedAttributeViolations(t *testing.T) {
+	d := smart.Disk{
+		Index: 0, Kind: smart.KindATA, SMARTChecksumKnown: true, SMARTChecksumValid: false,
+		Attrs: []smart.Attr{{ID: 0x05, Name: "Reallocated_Sector_Ct", Raw: 1}},
+	}
+	got := Evaluate([]smart.Disk{d})
+	if len(got) != 1 || got[0].AttrID != -1 || got[0].Severity != Warning {
+		t.Fatalf("corrupt SMART data should only produce integrity warning: %+v", got)
+	}
+}
+
 func TestInvalidATASMARTThresholdChecksumCreatesWarning(t *testing.T) {
 	d := smart.Disk{Index: 0, Kind: smart.KindATA, SMARTThresholdChecksumKnown: true, SMARTThresholdChecksumValid: false}
 	got := Evaluate([]smart.Disk{d})
