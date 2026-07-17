@@ -25,6 +25,21 @@ func TestATAReadErrorUsesNormalizedThreshold(t *testing.T) {
 	}
 }
 
+func TestATAOverallSMARTFailureCreatesCriticalViolation(t *testing.T) {
+	d := smart.Disk{Index: 0, Kind: smart.KindATA, SmartStatusKnown: true, SmartStatusPassed: false}
+	got := Evaluate([]smart.Disk{d})
+	if len(got) != 1 || got[0].AttrID != 0 || got[0].Severity != Critical || got[0].AttrName != "SMART_Overall_Health" {
+		t.Fatalf("expected overall SMART failure violation: %+v", got)
+	}
+}
+
+func TestATAUnknownOverallSMARTStatusDoesNotCreateViolation(t *testing.T) {
+	d := smart.Disk{Index: 0, Kind: smart.KindATA, SmartStatusKnown: false, SmartStatusPassed: false}
+	if got := Evaluate([]smart.Disk{d}); len(got) != 0 {
+		t.Fatalf("unexpected violation for unknown overall status: %+v", got)
+	}
+}
+
 func TestNVMePercentageUsedIsNotFailureAtFiftyPercent(t *testing.T) {
 	for _, value := range []uint64{50, 79} {
 		d := smart.Disk{Index: 0, Kind: smart.KindNVMe, Attrs: []smart.Attr{{

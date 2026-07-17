@@ -65,6 +65,9 @@ func evaluateATA(d smart.Disk) []Violation {
 			Severity:  sev,
 		})
 	}
+	if d.SmartStatusKnown && !d.SmartStatusPassed {
+		add(smart.Attr{ID: 0, Name: "SMART_Overall_Health"}, Critical, "FAILED", "PASSED")
+	}
 
 	for _, a := range d.Attrs {
 		switch a.ID {
