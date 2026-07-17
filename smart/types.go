@@ -25,29 +25,30 @@ type Attr struct {
 
 // NVMe 字段伪 ID（用于 Attr.ID，避免与 ATA 冲突）
 const (
-	NVMeCriticalWarning    = 0xF0
-	NVMeTemperature        = 0xF1
-	NVMeAvailableSpare     = 0xF2
-	NVMeAvailSpareThresh   = 0xF3
-	NVMePercentUsed        = 0xF4
-	NVMeMediaErrors        = 0xF5 // "Media and Data Integrity Errors"
-	NVMeReadOnly           = 0xF6
-	NVMeDataUnitsRead      = 0xF7
-	NVMeDataUnitsWritten   = 0xF8
-	NVMePowerCycles        = 0xF9
-	NVMePowerOnHours       = 0xFA
-	NVMeUnsafeShutdowns    = 0xFB
-	NVMeErrorInfoEntries   = 0xFC
-	NVMeWarningTempTime    = 0xFD
-	NVMeCriticalTempTime   = 0xFE
-	NVMeTemperatureSensor1 = 0x100
-	NVMeTemperatureSensor2 = 0x101
-	NVMeTemperatureSensor3 = 0x102
-	NVMeTemperatureSensor4 = 0x103
-	NVMeTemperatureSensor5 = 0x104
-	NVMeTemperatureSensor6 = 0x105
-	NVMeTemperatureSensor7 = 0x106
-	NVMeTemperatureSensor8 = 0x107
+	NVMeCriticalWarning               = 0xF0
+	NVMeTemperature                   = 0xF1
+	NVMeAvailableSpare                = 0xF2
+	NVMeAvailSpareThresh              = 0xF3
+	NVMePercentUsed                   = 0xF4
+	NVMeMediaErrors                   = 0xF5 // "Media and Data Integrity Errors"
+	NVMeReadOnly                      = 0xF6
+	NVMeDataUnitsRead                 = 0xF7
+	NVMeDataUnitsWritten              = 0xF8
+	NVMePowerCycles                   = 0xF9
+	NVMePowerOnHours                  = 0xFA
+	NVMeUnsafeShutdowns               = 0xFB
+	NVMeErrorInfoEntries              = 0xFC
+	NVMeWarningTempTime               = 0xFD
+	NVMeCriticalTempTime              = 0xFE
+	NVMeTemperatureSensor1            = 0x100
+	NVMeTemperatureSensor2            = 0x101
+	NVMeTemperatureSensor3            = 0x102
+	NVMeTemperatureSensor4            = 0x103
+	NVMeTemperatureSensor5            = 0x104
+	NVMeTemperatureSensor6            = 0x105
+	NVMeTemperatureSensor7            = 0x106
+	NVMeTemperatureSensor8            = 0x107
+	NVMeEnduranceGroupCriticalWarning = 0x108
 )
 
 // Disk 是一块物理磁盘的 SMART 汇总

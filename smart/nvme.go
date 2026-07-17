@@ -129,6 +129,7 @@ func parseNVMeHealthLog(data []byte) []Attr {
 	spare := data[0x03]
 	spareThresh := data[0x04]
 	pctUsed := data[0x05]
+	enduranceGroupCW := data[0x06]
 	dataUnitsRead, dataUnitsReadHigh := readNVMeUint128(data, 0x20)
 	dataUnitsWritten, dataUnitsWrittenHigh := readNVMeUint128(data, 0x30)
 	powerCycles, powerCyclesHigh := readNVMeUint128(data, 0x70)
@@ -144,6 +145,7 @@ func parseNVMeHealthLog(data []byte) []Attr {
 	attrs = append(attrs, Attr{ID: NVMeAvailableSpare, Name: "Available_Spare_Pct", Raw: uint64(spare), Kind: "nvme"})
 	attrs = append(attrs, Attr{ID: NVMeAvailSpareThresh, Name: "Available_Spare_Threshold", Raw: uint64(spareThresh), Kind: "nvme"})
 	attrs = append(attrs, Attr{ID: NVMePercentUsed, Name: "Percentage_Used", Raw: uint64(pctUsed), Kind: "nvme"})
+	attrs = append(attrs, Attr{ID: NVMeEnduranceGroupCriticalWarning, Name: "Endurance_Group_Critical_Warning_Summary", Raw: uint64(enduranceGroupCW), Kind: "nvme"})
 	attrs = append(attrs, Attr{ID: NVMeMediaErrors, Name: "Media_Data_Integrity_Errors", Raw: mediaErrors, RawHigh: mediaErrorsHigh, Kind: "nvme"})
 	attrs = append(attrs, Attr{ID: NVMeDataUnitsRead, Name: "Data_Units_Read", Raw: dataUnitsRead, RawHigh: dataUnitsReadHigh, Kind: "nvme"})
 	attrs = append(attrs, Attr{ID: NVMeDataUnitsWritten, Name: "Data_Units_Written", Raw: dataUnitsWritten, RawHigh: dataUnitsWrittenHigh, Kind: "nvme"})

@@ -2,6 +2,7 @@ package health
 
 import (
 	"math"
+	"strings"
 	"testing"
 
 	"smonitor/smart"
@@ -144,6 +145,16 @@ func TestNVMeCriticalWarningTextExplainsMixedAndUnknownBits(t *testing.T) {
 	want := "0x8b (可用备用空间低于阈值；温度超过临界阈值；控制器已进入只读模式；未知保留位 0x80)"
 	if got != want {
 		t.Fatalf("critical warning text = %q, want %q", got, want)
+	}
+}
+
+func TestNVMeEnduranceGroupCriticalWarningCreatesViolation(t *testing.T) {
+	d := smart.Disk{Index: 0, Kind: smart.KindNVMe, Attrs: []smart.Attr{{
+		ID: smart.NVMeEnduranceGroupCriticalWarning, Raw: 0x04,
+	}}}
+	got := Evaluate([]smart.Disk{d})
+	if len(got) != 1 || got[0].Severity != Critical || !strings.Contains(got[0].Current, "可靠性已降级") {
+		t.Fatalf("unexpected endurance-group warning: %+v", got)
 	}
 }
 

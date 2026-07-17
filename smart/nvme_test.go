@@ -33,6 +33,7 @@ func TestParseNVMeHealthLog(t *testing.T) {
 	data[3] = 95
 	data[4] = 10
 	data[5] = 7
+	data[6] = 0x04
 	binary.LittleEndian.PutUint64(data[0x20:0x28], 1000000)
 	binary.LittleEndian.PutUint64(data[0x28:0x30], 1)
 	binary.LittleEndian.PutUint64(data[0x70:0x78], 12)
@@ -48,7 +49,7 @@ func TestParseNVMeHealthLog(t *testing.T) {
 	}
 	if values[NVMeTemperature] != 300 || values[NVMeTemperatureSensor1] != 310 || values[NVMePowerCycles] != 12 ||
 		values[NVMePowerOnHours] != 34 || values[NVMeMediaErrors] != 2 ||
-		values[NVMeWarningTempTime] != 9 || values[NVMeReadOnly] != 1 {
+		values[NVMeWarningTempTime] != 9 || values[NVMeReadOnly] != 1 || values[NVMeEnduranceGroupCriticalWarning] != 0x04 {
 		t.Fatalf("unexpected NVMe attributes: %+v", values)
 	}
 	for _, a := range attrs {

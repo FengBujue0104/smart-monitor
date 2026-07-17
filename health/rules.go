@@ -218,7 +218,7 @@ func evaluateNVMe(d smart.Disk) []Violation {
 			}
 		case smart.NVMeTemperature:
 			addNVMeTemperatureViolation(add, a)
-		case smart.NVMeCriticalWarning:
+		case smart.NVMeCriticalWarning, smart.NVMeEnduranceGroupCriticalWarning:
 			if a.Raw != 0 {
 				add(a, Critical, nvmeCriticalWarningText(a.Raw), "= 0")
 			}
