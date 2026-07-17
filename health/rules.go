@@ -3,6 +3,7 @@ package health
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"smonitor/smart"
 )
@@ -215,7 +216,7 @@ func evaluateNVMe(d smart.Disk) []Violation {
 			}
 		case smart.NVMeCriticalWarning:
 			if a.Raw != 0 {
-				add(a, Critical, "0x"+strconv.FormatUint(a.Raw, 16), "= 0")
+				add(a, Critical, nvmeCriticalWarningText(a.Raw), "= 0")
 			}
 		case smart.NVMeAvailableSpare:
 			// 由后面的 AvailableSpare < Threshold 统一判断。
@@ -252,4 +253,30 @@ func u128s(low, high uint64) string {
 		return u64s(low)
 	}
 	return fmt.Sprintf("0x%016X%016X", high, low)
+}
+
+func nvmeCriticalWarningText(value uint64) string {
+	known := []struct {
+		mask   uint64
+		reason string
+	}{
+		{mask: 1 << 0, reason: "可用备用空间低于阈值"},
+		{mask: 1 << 1, reason: "温度超过临界阈值"},
+		{mask: 1 << 2, reason: "可靠性已降级"},
+		{mask: 1 << 3, reason: "控制器已进入只读模式"},
+		{mask: 1 << 4, reason: "易失性缓存备份设备故障"},
+	}
+	var reasons []string
+	for _, bit := range known {
+		if value&bit.mask != 0 {
+			reasons = append(reasons, bit.reason)
+		}
+	}
+	if unknown := value &^ 0x1F; unknown != 0 {
+		reasons = append(reasons, fmt.Sprintf("未知保留位 0x%X", unknown))
+	}
+	if len(reasons) == 0 {
+		return "0x" + strconv.FormatUint(value, 16)
+	}
+	return "0x" + strconv.FormatUint(value, 16) + " (" + strings.Join(reasons, "；") + ")"
 }

@@ -116,8 +116,16 @@ func TestNVMeCriticalWarningIsFormattedAsHex(t *testing.T) {
 		ID: smart.NVMeCriticalWarning, Raw: 0x10,
 	}}}
 	got := Evaluate([]smart.Disk{d})
-	if len(got) != 1 || got[0].Current != "0x10" {
+	if len(got) != 1 || got[0].Current != "0x10 (易失性缓存备份设备故障)" {
 		t.Fatalf("unexpected critical warning: %+v", got)
+	}
+}
+
+func TestNVMeCriticalWarningTextExplainsMixedAndUnknownBits(t *testing.T) {
+	got := nvmeCriticalWarningText(0x8B)
+	want := "0x8b (可用备用空间低于阈值；温度超过临界阈值；控制器已进入只读模式；未知保留位 0x80)"
+	if got != want {
+		t.Fatalf("critical warning text = %q, want %q", got, want)
 	}
 }
 
