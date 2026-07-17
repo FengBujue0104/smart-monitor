@@ -117,7 +117,9 @@ func parseNVMeProtocolStatus(buf []byte) error {
 //	0xC4    4     CriticalCompTempTime（分钟）
 //	0xC8    8*2   SensorTemperature[8]（开尔文）
 func parseNVMeHealthLog(data []byte) []Attr {
-	if len(data) < 0xCA {
+	// 基础健康字段到 CriticalCompTempTime 末尾（0xC8）。温度传感器
+	// 数组是可选的，因此不能因日志只携带部分传感器而拒绝整个页面。
+	if len(data) < 0xC8 {
 		return nil
 	}
 	var attrs []Attr
@@ -153,6 +155,9 @@ func parseNVMeHealthLog(data []byte) []Attr {
 	attrs = append(attrs, Attr{ID: NVMeCriticalTempTime, Name: "Critical_Temperature_Time", Raw: criticalTempTime, Kind: "nvme"})
 	for i := 0; i < 8; i++ {
 		off := 0xC8 + i*2
+		if off+2 > len(data) {
+			break
+		}
 		temp := binary.LittleEndian.Uint16(data[off : off+2])
 		if temp == 0 {
 			continue

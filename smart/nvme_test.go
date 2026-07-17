@@ -58,6 +58,24 @@ func TestParseNVMeHealthLog(t *testing.T) {
 	}
 }
 
+func TestParseNVMeHealthLogAllowsPartialTemperatureSensorArray(t *testing.T) {
+	data := make([]byte, 0xCA) // 基础字段 + 仅第一个可选温度传感器
+	binary.LittleEndian.PutUint16(data[1:3], 300)
+	binary.LittleEndian.PutUint16(data[0xC8:0xCA], 310)
+
+	attrs := parseNVMeHealthLog(data)
+	values := map[int]uint64{}
+	for _, a := range attrs {
+		values[a.ID] = a.Raw
+	}
+	if values[NVMeTemperature] != 300 || values[NVMeTemperatureSensor1] != 310 {
+		t.Fatalf("unexpected attributes from partial sensor array: %+v", values)
+	}
+	if _, ok := values[NVMeTemperatureSensor2]; ok {
+		t.Fatalf("unexpected second sensor from truncated data: %+v", values)
+	}
+}
+
 func TestParseNVMeProtocolStatus(t *testing.T) {
 	buf := make([]byte, 0x18)
 	binary.LittleEndian.PutUint32(buf[0x10:0x14], 1)
