@@ -157,17 +157,21 @@ func (m *reportModel) build() {
 			})
 		}
 		if len(d.Attrs) == 0 {
+			name, status := "SMART 数据未读取", "❔ 未读取"
+			if d.Kind == smart.KindUnknown {
+				name, status = "SMART 不适用", "— 不适用"
+			}
 			m.rows = append(m.rows, reportRow{
 				disk:     dname,
 				kind:     string(d.Kind),
 				id:       -1,
 				flags:    "-",
-				name:     "SMART 数据未读取",
+				name:     name,
 				raw:      "-",
 				current:  "-",
 				worst:    "-",
 				limit:    "-",
-				status:   "❔ 未读取",
+				status:   status,
 				severity: "unknown",
 			})
 			continue
@@ -336,6 +340,9 @@ func diskSummary(d smart.Disk) string {
 		summary = fmt.Sprintf("%s (%.0f GB)", summary, d.SizeGB)
 	}
 	if len(d.Attrs) == 0 {
+		if d.Kind == smart.KindUnknown {
+			return summary + " [SMART不适用]"
+		}
 		return summary + " [SMART未读取]"
 	}
 	if d.SmartStatusKnown {
@@ -421,17 +428,34 @@ func threshStr(t int) string {
 func unreadSMARTCount(disks []smart.Disk) int {
 	count := 0
 	for _, d := range disks {
-		if len(d.Attrs) == 0 {
+		if isSMARTApplicable(d) && len(d.Attrs) == 0 {
 			count++
 		}
 	}
 	return count
 }
 
+func smartApplicableCount(disks []smart.Disk) int {
+	count := 0
+	for _, d := range disks {
+		if isSMARTApplicable(d) {
+			count++
+		}
+	}
+	return count
+}
+
+func isSMARTApplicable(d smart.Disk) bool {
+	return d.Kind != smart.KindUnknown
+}
+
 func alertBannerText(disks []smart.Disk, vs []health.Violation) string {
 	if len(vs) == 0 {
 		if unread := unreadSMARTCount(disks); unread > 0 {
 			return fmt.Sprintf("⚠️ %d 块磁盘未读取到 SMART 数据，无法得出完整健康结论", unread)
+		}
+		if smartApplicableCount(disks) == 0 {
+			return "ℹ️ 未发现支持 SMART 的物理磁盘"
 		}
 		return "✅ 所有监测的 SMART 指标均处于安全范围"
 	}
@@ -456,6 +480,9 @@ func alertBannerColor(disks []smart.Disk, vs []health.Violation) walk.Color {
 	}
 	if unreadSMARTCount(disks) > 0 {
 		return walk.RGB(0xB0, 0x60, 0x00)
+	}
+	if smartApplicableCount(disks) == 0 {
+		return walk.RGB(0x44, 0x44, 0x44)
 	}
 	return walk.RGB(0x1B, 0x7A, 0x2F)
 }

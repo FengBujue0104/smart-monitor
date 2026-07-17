@@ -125,3 +125,19 @@ func TestAlertBannerTextRepresentsCurrentScanState(t *testing.T) {
 		t.Fatalf("unexpected violation banner: %q", got)
 	}
 }
+
+func TestVirtualDiskIsNotReportedAsUnreadSMART(t *testing.T) {
+	disks := []smart.Disk{{Kind: smart.KindUnknown, Model: "Virtual Disk"}}
+	if unreadSMARTCount(disks) != 0 || smartApplicableCount(disks) != 0 {
+		t.Fatalf("unexpected SMART applicability: unread=%d applicable=%d", unreadSMARTCount(disks), smartApplicableCount(disks))
+	}
+	if got := diskSummary(disks[0]); !strings.Contains(got, "SMART不适用") {
+		t.Fatalf("unexpected virtual disk summary: %q", got)
+	}
+	if got := alertBannerText(disks, nil); !strings.Contains(got, "未发现支持 SMART") {
+		t.Fatalf("unexpected virtual disk banner: %q", got)
+	}
+	if got := buildTextReport(disks, nil); !strings.Contains(got, "不提供 SMART 数据") || !strings.Contains(got, "未发现支持 SMART") {
+		t.Fatalf("unexpected virtual disk report: %q", got)
+	}
+}

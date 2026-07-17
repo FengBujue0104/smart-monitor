@@ -6,8 +6,9 @@ import "time"
 type DiskKind string
 
 const (
-	KindATA  DiskKind = "ATA"
-	KindNVMe DiskKind = "NVMe"
+	KindATA     DiskKind = "ATA"
+	KindNVMe    DiskKind = "NVMe"
+	KindUnknown DiskKind = "Other"
 )
 
 // Attr 是统一后的 SMART 属性（ATA 与 NVMe 共用）

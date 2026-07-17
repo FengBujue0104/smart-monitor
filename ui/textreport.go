@@ -26,7 +26,11 @@ func buildTextReport(disks []smart.Disk, vs []health.Violation) string {
 		b.WriteString(fmt.Sprintf("[磁盘 %d] %s  (%s)  容量:%.1f GB  SMART:%s  属性校验和:%s  阈值校验和:%s  S/N:%s  FW:%s\n",
 			d.Index, d.Model, d.Kind, d.SizeGB, smartStatusText(d), smartChecksumText(d), smartThresholdChecksumText(d), d.Serial, d.Firmware))
 		if len(d.Attrs) == 0 {
-			b.WriteString("  (未读取到 SMART 属性)\n\n")
+			if d.Kind == smart.KindUnknown {
+				b.WriteString("  (该总线类型不提供 SMART 数据)\n\n")
+			} else {
+				b.WriteString("  (未读取到 SMART 属性)\n\n")
+			}
 			continue
 		}
 		for _, a := range d.Attrs {
@@ -60,6 +64,8 @@ func buildTextReport(disks []smart.Disk, vs []health.Violation) string {
 	} else {
 		if unread := unreadSMARTCount(disks); unread > 0 {
 			b.WriteString(fmt.Sprintf("结论: %d 块磁盘未读取到 SMART 数据，无法得出完整健康结论。\n", unread))
+		} else if smartApplicableCount(disks) == 0 {
+			b.WriteString("结论: 未发现支持 SMART 的物理磁盘。\n")
 		} else {
 			b.WriteString("结论: 所有监测指标在安全范围内。\n")
 		}

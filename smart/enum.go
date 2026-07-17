@@ -37,6 +37,21 @@ const (
 	maxPhysDrives = 256
 )
 
+const (
+	storageBusTypeNVMe           = 0x11
+	storageBusTypeVirtual        = 0x0E
+	storageBusTypeFileBackedVirt = 0x0F
+	storageBusTypeSpaces         = 0x10
+)
+
+func storageBusSupportsSMART(busType uint32) bool {
+	switch busType {
+	case storageBusTypeVirtual, storageBusTypeFileBackedVirt, storageBusTypeSpaces:
+		return false
+	}
+	return true
+}
+
 // queryStorageDevice 发 IOCTL_STORAGE_QUERY_PROPERTY，返回原始描述符字节。
 func queryStorageDevice(h windows.Handle) ([]byte, error) {
 	q := storagePropertyQuery{
@@ -154,7 +169,7 @@ func Discover() ([]Disk, error) {
 		d.SizeGB = queryDiskSizeGB(h)
 
 		switch {
-		case busType == 0x11: // NVMe
+		case busType == storageBusTypeNVMe:
 			d.Kind = KindNVMe
 			attrs, err := ReadNVMeHealth(h)
 			if err != nil {
@@ -162,6 +177,8 @@ func Discover() ([]Disk, error) {
 				d.Kind = KindNVMe
 			}
 			d.Attrs = attrs
+		case !storageBusSupportsSMART(busType):
+			d.Kind = KindUnknown
 		default:
 			d.Kind = KindATA
 			// 型号/序列号/固件已由 IOCTL_STORAGE_QUERY_PROPERTY 在 desc 中解析；

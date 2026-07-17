@@ -22,3 +22,14 @@ func TestParseStorageDescriptorTrimsIdentityFields(t *testing.T) {
 		t.Fatalf("unexpected descriptor: vendor=%q product=%q revision=%q serial=%q bus=%#x", vendor, product, revision, serial, busType)
 	}
 }
+
+func TestStorageBusSupportsSMARTExcludesVirtualDisks(t *testing.T) {
+	for _, busType := range []uint32{storageBusTypeVirtual, storageBusTypeFileBackedVirt, storageBusTypeSpaces} {
+		if storageBusSupportsSMART(busType) {
+			t.Fatalf("virtual bus type %#x should not be probed for SMART", busType)
+		}
+	}
+	if !storageBusSupportsSMART(0x0B) { // SATA
+		t.Fatal("SATA should remain eligible for SMART probing")
+	}
+}
