@@ -84,9 +84,15 @@ func mergeFallbackDisks(primary, fallback []smart.Disk) []smart.Disk {
 	result := make([]smart.Disk, 0, len(primary)+len(fallback))
 	for _, d := range primary {
 		seen[d.Index] = true
-		if len(d.Attrs) == 0 {
-			if f, ok := byIndex[d.Index]; ok && len(f.Attrs) > 0 && f.Kind == d.Kind {
+		if f, ok := byIndex[d.Index]; ok && f.Kind == d.Kind {
+			if len(d.Attrs) == 0 && len(f.Attrs) > 0 {
 				d.Attrs = f.Attrs
+			}
+			// ATA pass-through 常能读取属性但不能返回 SMART RETURN STATUS。
+			// 此时用 WMI 的状态补齐；已由主路径成功读取的状态绝不覆盖。
+			if !d.SmartStatusKnown && f.SmartStatusKnown {
+				d.SmartStatusKnown = true
+				d.SmartStatusPassed = f.SmartStatusPassed
 			}
 		}
 		result = append(result, d)
