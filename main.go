@@ -71,6 +71,9 @@ func hasMissingSMART(disks []smart.Disk) bool {
 		if len(d.Attrs) == 0 {
 			return true
 		}
+		if d.Kind == smart.KindATA && d.SMARTChecksumKnown && !d.SMARTChecksumValid {
+			return true
+		}
 	}
 	return false
 }
@@ -85,8 +88,15 @@ func mergeFallbackDisks(primary, fallback []smart.Disk) []smart.Disk {
 	for _, d := range primary {
 		seen[d.Index] = true
 		if f, ok := byIndex[d.Index]; ok && f.Kind == d.Kind {
-			if len(d.Attrs) == 0 && len(f.Attrs) > 0 {
+			primaryCorrupt := d.Kind == smart.KindATA && d.SMARTChecksumKnown && !d.SMARTChecksumValid
+			fallbackCanReplace := len(d.Attrs) == 0 || (primaryCorrupt && f.SMARTChecksumKnown && f.SMARTChecksumValid)
+			if fallbackCanReplace && len(f.Attrs) > 0 {
 				d.Attrs = f.Attrs
+				// WMI 数据页带有完整页校验时，可明确用它替换损坏的 IOCTL 页。
+				if f.SMARTChecksumKnown {
+					d.SMARTChecksumKnown = true
+					d.SMARTChecksumValid = f.SMARTChecksumValid
+				}
 			}
 			// ATA pass-through 常能读取属性但不能返回 SMART RETURN STATUS。
 			// 此时用 WMI 的状态补齐；已由主路径成功读取的状态绝不覆盖。

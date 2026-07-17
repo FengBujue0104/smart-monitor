@@ -28,3 +28,28 @@ func TestMergeFallbackDisksOnlyFillsMissingAttributes(t *testing.T) {
 		t.Fatalf("fallback SMART status was not copied: %+v", got[1])
 	}
 }
+
+func TestMergeFallbackDisksReplacesCorruptATASMARTData(t *testing.T) {
+	primary := []smart.Disk{{
+		Index: 0, Kind: smart.KindATA, Attrs: []smart.Attr{{ID: 1}},
+		SMARTChecksumKnown: true, SMARTChecksumValid: false,
+	}}
+	fallback := []smart.Disk{{
+		Index: 0, Kind: smart.KindATA, Attrs: []smart.Attr{{ID: 5}},
+		SMARTChecksumKnown: true, SMARTChecksumValid: true,
+	}}
+
+	got := mergeFallbackDisks(primary, fallback)
+	if len(got) != 1 || len(got[0].Attrs) != 1 || got[0].Attrs[0].ID != 5 || !got[0].SMARTChecksumValid {
+		t.Fatalf("expected valid fallback SMART data: %+v", got)
+	}
+}
+
+func TestHasMissingSMARTTreatsInvalidATAChecksumAsRecoverable(t *testing.T) {
+	if !hasMissingSMART([]smart.Disk{{Kind: smart.KindATA, Attrs: []smart.Attr{{ID: 1}}, SMARTChecksumKnown: true, SMARTChecksumValid: false}}) {
+		t.Fatal("invalid ATA SMART checksum should trigger fallback")
+	}
+	if hasMissingSMART([]smart.Disk{{Kind: smart.KindATA, Attrs: []smart.Attr{{ID: 1}}, SMARTChecksumKnown: true, SMARTChecksumValid: true}}) {
+		t.Fatal("valid ATA SMART data should not trigger fallback")
+	}
+}
