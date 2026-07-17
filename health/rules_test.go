@@ -1,6 +1,7 @@
 package health
 
 import (
+	"math"
 	"testing"
 
 	"smonitor/smart"
@@ -59,5 +60,25 @@ func TestNVMeSpareUsesDeviceThreshold(t *testing.T) {
 	got := Evaluate([]smart.Disk{d})
 	if len(got) != 1 || got[0].Severity != Critical {
 		t.Fatalf("expected spare threshold failure: %+v", got)
+	}
+}
+
+func TestNVMeCriticalWarningIsFormattedAsHex(t *testing.T) {
+	d := smart.Disk{Index: 0, Kind: smart.KindNVMe, Attrs: []smart.Attr{{
+		ID: smart.NVMeCriticalWarning, Raw: 0x10,
+	}}}
+	got := Evaluate([]smart.Disk{d})
+	if len(got) != 1 || got[0].Current != "0x10" {
+		t.Fatalf("unexpected critical warning: %+v", got)
+	}
+}
+
+func TestNVMeCountersDoNotOverflowWhenReported(t *testing.T) {
+	d := smart.Disk{Index: 0, Kind: smart.KindNVMe, Attrs: []smart.Attr{{
+		ID: smart.NVMeMediaErrors, Raw: math.MaxUint64,
+	}}}
+	got := Evaluate([]smart.Disk{d})
+	if len(got) != 1 || got[0].Current != "18446744073709551615" {
+		t.Fatalf("unexpected media error count: %+v", got)
 	}
 }

@@ -1,6 +1,10 @@
 package health
 
-import "smonitor/smart"
+import (
+	"strconv"
+
+	"smonitor/smart"
+)
 
 // Severity 违规严重度
 type Severity = string
@@ -164,7 +168,7 @@ func evaluateNVMe(d smart.Disk) []Violation {
 			}
 		case smart.NVMeCriticalWarning:
 			if a.Raw != 0 {
-				add(a, Critical, "0x"+itoa(int(a.Raw)), "= 0")
+				add(a, Critical, "0x"+strconv.FormatUint(a.Raw, 16), "= 0")
 			}
 		case smart.NVMeAvailableSpare:
 			// 由后面的 AvailableSpare < Threshold 统一判断。
@@ -192,28 +196,6 @@ func evaluateNVMe(d smart.Disk) []Violation {
 
 // 小工具
 func u64s(v uint64) string {
-	return itoa(int(v))
+	return strconv.FormatUint(v, 10)
 }
-func its(v int) string { return itoa(v) }
-
-func itoa(v int) string {
-	if v == 0 {
-		return "0"
-	}
-	neg := v < 0
-	if neg {
-		v = -v
-	}
-	var b [20]byte
-	n := 20
-	for v > 0 {
-		n--
-		b[n] = byte('0' + v%10)
-		v /= 10
-	}
-	if neg {
-		n--
-		b[n] = '-'
-	}
-	return string(b[n:])
-}
+func its(v int) string { return strconv.Itoa(v) }
