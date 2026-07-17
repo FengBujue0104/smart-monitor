@@ -136,9 +136,28 @@ func ReadSMARTOverallStatus(h windows.Handle) (bool, error) {
 		return false, fmt.Errorf("ATA SMART RETURN STATUS: %w", err)
 	}
 	if runtime.GOARCH == "386" {
-		return parseSMARTReturnStatus(buf[32:40])
+		taskFile, err := smartStatusTaskFile(buf, returned, 32)
+		if err != nil {
+			return false, err
+		}
+		return parseSMARTReturnStatus(taskFile)
 	}
-	return parseSMARTReturnStatus(buf[40:48])
+	taskFile, err := smartStatusTaskFile(buf, returned, 40)
+	if err != nil {
+		return false, err
+	}
+	return parseSMARTReturnStatus(taskFile)
+}
+
+// smartStatusTaskFile rejects responses which did not include the returned
+// task file. Without this check the input pass signature could be mistaken for
+// a successful SMART status after a controller returns a short response.
+func smartStatusTaskFile(buf []byte, returned uint32, offset int) ([]byte, error) {
+	const taskFileSize = 8
+	if offset < 0 || offset+taskFileSize > len(buf) || returned < uint32(offset+taskFileSize) {
+		return nil, fmt.Errorf("ATA SMART RETURN STATUS response too short: got=%d", returned)
+	}
+	return buf[offset : offset+taskFileSize], nil
 }
 
 // issueSmartCommand 通过 SMART_RCV_DRIVE_DATA 发命令并返回数据缓冲区。

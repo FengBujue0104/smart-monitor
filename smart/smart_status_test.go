@@ -27,3 +27,13 @@ func TestParseSMARTReturnStatus(t *testing.T) {
 		t.Fatalf("expected SMART failure, got ok=%v err=%v", ok, err)
 	}
 }
+
+func TestSMARTStatusTaskFileRejectsTruncatedResponse(t *testing.T) {
+	buf := make([]byte, 48)
+	if _, err := smartStatusTaskFile(buf, 40, 40); err == nil {
+		t.Fatal("expected short response error")
+	}
+	if taskFile, err := smartStatusTaskFile(buf, 48, 40); err != nil || len(taskFile) != 8 {
+		t.Fatalf("expected complete task file, got %x err=%v", taskFile, err)
+	}
+}
