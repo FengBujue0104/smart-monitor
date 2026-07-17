@@ -101,7 +101,7 @@ func issueNVMeGetLogPage(h windows.Handle, logID uint8) ([]byte, error) {
 //	0x5C    4     CriticalCompTempTime（分钟）
 //	0x60..  8*8   SensorTemperature[8]（开尔文）
 func parseNVMeHealthLog(data []byte) []Attr {
-	if len(data) < 0x58 {
+	if len(data) < 0x60 {
 		return nil
 	}
 	var attrs []Attr

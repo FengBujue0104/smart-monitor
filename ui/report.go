@@ -51,9 +51,10 @@ func RunReport(disks []smart.Disk, violations []health.Violation) error {
 					{Title: "类型", Width: 50},
 					{Title: "属性ID", Width: 60},
 					{Title: "属性名", Width: 220},
-					{Title: "当前值", Width: 90},
+					{Title: "Raw值", Width: 150},
+					{Title: "当前值", Width: 80},
+					{Title: "最差", Width: 60},
 					{Title: "阈值", Width: 60},
-					{Title: "归一化", Width: 70},
 					{Title: "状态", Width: 80},
 				},
 			},
@@ -106,10 +107,10 @@ type reportRow struct {
 	kind     string
 	id       int
 	name     string
-	cur      string
+	raw      string
+	current  string
+	worst    string
 	limit    string
-	value    int
-	worst    int
 	status   string
 	severity string
 }
@@ -137,10 +138,10 @@ func (m *reportModel) build() {
 				kind:     string(d.Kind),
 				id:       a.ID,
 				name:     a.Name,
-				cur:      attrCurStr(a),
+				raw:      attrRawStr(a),
+				current:  attrCurrentStr(a),
+				worst:    attrWorstStr(a),
 				limit:    threshStr(a.Thresh),
-				value:    a.Value,
-				worst:    a.Worst,
 				severity: sev,
 			}
 			switch sev {
@@ -185,12 +186,14 @@ func (m *reportModel) Value(row, col int) interface{} {
 	case 3:
 		return r.name
 	case 4:
-		return r.cur
+		return r.raw
 	case 5:
-		return r.limit
+		return r.current
 	case 6:
-		return fmt.Sprintf("C%d/W%d", r.value, r.worst)
+		return r.worst
 	case 7:
+		return r.limit
+	case 8:
 		return r.status
 	}
 	return ""
@@ -215,20 +218,45 @@ func (m *reportModel) StyleCell(c *walk.CellStyle) {
 	}
 }
 
-func attrCurStr(a smart.Attr) string {
-	if a.Kind == "nvme" && a.ID == smart.NVMeTemperature {
-		return fmt.Sprintf("%d°C", int(a.Raw)-273)
-	}
-	if a.ID == 0xC2 || a.ID == 0xB9 || a.ID == 0xBE {
-		return fmt.Sprintf("%d°C", a.Raw&0xFF)
-	}
+func attrRawStr(a smart.Attr) string {
 	if a.Kind == "nvme" {
 		switch a.ID {
+		case smart.NVMeTemperature:
+			return fmt.Sprintf("%d°C", int(a.Raw)-273)
 		case smart.NVMeAvailableSpare, smart.NVMeAvailSpareThresh, smart.NVMePercentUsed:
 			return fmt.Sprintf("%d%%", a.Raw)
+		case smart.NVMeDataUnitsRead, smart.NVMeDataUnitsWritten:
+			return fmt.Sprintf("%.2f TB (%d units)", float64(a.Raw)*512000.0/1e12, a.Raw)
+		case smart.NVMePowerOnHours:
+			return fmt.Sprintf("%d h", a.Raw)
+		case smart.NVMeWarningTempTime, smart.NVMeCriticalTempTime:
+			return fmt.Sprintf("%d min", a.Raw)
 		}
 	}
+	if a.ID == 0xC2 || a.ID == 0xB9 || a.ID == 0xBE {
+		return fmt.Sprintf("%d°C (raw %d)", a.Raw&0xFF, a.Raw)
+	}
+	if a.ID == 0x09 {
+		return fmt.Sprintf("%d h", a.Raw)
+	}
+	if a.ID == 0x0C {
+		return fmt.Sprintf("%d", a.Raw)
+	}
 	return fmt.Sprintf("%d", a.Raw)
+}
+
+func attrCurrentStr(a smart.Attr) string {
+	if a.Kind == "nvme" {
+		return "-"
+	}
+	return fmt.Sprintf("%d", a.Value)
+}
+
+func attrWorstStr(a smart.Attr) string {
+	if a.Kind == "nvme" {
+		return "-"
+	}
+	return fmt.Sprintf("%d", a.Worst)
 }
 
 func threshStr(t int) string {
