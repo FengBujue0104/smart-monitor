@@ -39,6 +39,43 @@ func TestBuildNVMeIdentifyControllerUsesAdminCommandLayout(t *testing.T) {
 	}
 }
 
+func TestBuildNVMeHealthLogPropertyQueryUsesWindowsSDKLayout(t *testing.T) {
+	buf := buildNVMeHealthLogPropertyQuery()
+	if len(buf) != 48 {
+		t.Fatalf("property query length = %d, want 48", len(buf))
+	}
+	if binary.LittleEndian.Uint32(buf[0:4]) != storageDeviceProtocolQuery ||
+		binary.LittleEndian.Uint32(buf[4:8]) != PropertyStandardQuery {
+		t.Fatalf("unexpected property-query header: % X", buf[:8])
+	}
+	protocol := buf[8:]
+	if binary.LittleEndian.Uint32(protocol[0:4]) != storageProtocolTypeNVMe ||
+		binary.LittleEndian.Uint32(protocol[4:8]) != nvmeDataTypeLogPage ||
+		binary.LittleEndian.Uint32(protocol[8:12]) != NVMeLogID_SMART_Health ||
+		binary.LittleEndian.Uint32(protocol[16:20]) != 40 ||
+		binary.LittleEndian.Uint32(protocol[20:24]) != 512 {
+		t.Fatalf("unexpected NVMe property query: % X", protocol)
+	}
+}
+
+func TestParseNVMeHealthLogPropertyResponseUsesReturnedDataOffset(t *testing.T) {
+	buf := make([]byte, 48+512)
+	protocol := buf[8:48]
+	binary.LittleEndian.PutUint32(protocol[0:4], storageProtocolTypeNVMe)
+	binary.LittleEndian.PutUint32(protocol[4:8], nvmeDataTypeLogPage)
+	binary.LittleEndian.PutUint32(protocol[16:20], 40)
+	binary.LittleEndian.PutUint32(protocol[20:24], 512)
+	buf[48] = 0x08
+	data, err := parseNVMeHealthLogPropertyResponse(buf, uint32(len(buf)))
+	if err != nil || len(data) != 512 || data[0] != 0x08 {
+		t.Fatalf("property response parse = % X, %v", data, err)
+	}
+	binary.LittleEndian.PutUint32(protocol[16:20], 39)
+	if _, err := parseNVMeHealthLogPropertyResponse(buf, uint32(len(buf))); err == nil {
+		t.Fatal("invalid response offset should fail")
+	}
+}
+
 func TestParseNVMeCompositeTemperatureThresholds(t *testing.T) {
 	identify := make([]byte, nvmeIdentifyControllerBytes)
 	binary.LittleEndian.PutUint16(identify[266:268], 333)

@@ -3,7 +3,6 @@ package smart
 import (
 	"encoding/binary"
 	"fmt"
-	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
@@ -15,11 +14,20 @@ import (
 
 const (
 	STORAGE_PROTOCOL_TYPE_NVMe  = 0x01
+	storageProtocolTypeNVMe     = 0x03 // STORAGE_PROTOCOL_TYPE.ProtocolTypeNvme
+	storageDeviceProtocolQuery  = 0x32 // StorageDeviceProtocolSpecificProperty
+	nvmeDataTypeLogPage         = 0x02
 	NVMeGetLogPage              = 0x02
 	NVMeIdentify                = 0x06
 	NVMeLogID_SMART_Health      = 0x02
 	NVMeIdentifyController      = 0x01
 	nvmeIdentifyControllerBytes = 4096
+)
+
+const (
+	storagePropertyQueryHeaderBytes = 8
+	storageProtocolSpecificDataSize = 40
+	nvmeHealthPropertyResponseBytes = storagePropertyQueryHeaderBytes + storageProtocolSpecificDataSize
 )
 
 // buildNVMeGetLogPage 构造 Get Log Page 命令缓冲区。
@@ -70,6 +78,55 @@ func issueNVMeGetLogPage(h windows.Handle, logID uint8) ([]byte, error) {
 func issueNVMeIdentifyController(h windows.Handle) ([]byte, error) {
 	buf := buildNVMeAdminCommand(NVMeIdentify, nvmeIdentifyControllerBytes, NVMeIdentifyController)
 	return issueNVMeAdminCommand(h, buf, nvmeIdentifyControllerBytes, "identify-controller")
+}
+
+// buildNVMeHealthLogPropertyQuery builds STORAGE_PROPERTY_QUERY followed by
+// STORAGE_PROTOCOL_SPECIFIC_DATA. This standard Windows transport is a
+// read-only alternative to IOCTL_STORAGE_PROTOCOL_COMMAND.
+func buildNVMeHealthLogPropertyQuery() []byte {
+	buf := make([]byte, nvmeHealthPropertyResponseBytes)
+	binary.LittleEndian.PutUint32(buf[0:4], storageDeviceProtocolQuery)
+	binary.LittleEndian.PutUint32(buf[4:8], PropertyStandardQuery)
+	protocol := buf[storagePropertyQueryHeaderBytes:]
+	binary.LittleEndian.PutUint32(protocol[0:4], storageProtocolTypeNVMe)
+	binary.LittleEndian.PutUint32(protocol[4:8], nvmeDataTypeLogPage)
+	binary.LittleEndian.PutUint32(protocol[8:12], NVMeLogID_SMART_Health)
+	binary.LittleEndian.PutUint32(protocol[16:20], storageProtocolSpecificDataSize)
+	binary.LittleEndian.PutUint32(protocol[20:24], 512)
+	return buf
+}
+
+func parseNVMeHealthLogPropertyResponse(buf []byte, returned uint32) ([]byte, error) {
+	if returned < nvmeHealthPropertyResponseBytes || len(buf) < nvmeHealthPropertyResponseBytes {
+		return nil, fmt.Errorf("NVMe property response too short: got=%d", returned)
+	}
+	protocol := buf[storagePropertyQueryHeaderBytes:]
+	if binary.LittleEndian.Uint32(protocol[0:4]) != storageProtocolTypeNVMe ||
+		binary.LittleEndian.Uint32(protocol[4:8]) != nvmeDataTypeLogPage {
+		return nil, fmt.Errorf("unexpected NVMe property response type")
+	}
+	dataOffset := binary.LittleEndian.Uint32(protocol[16:20])
+	dataLength := binary.LittleEndian.Uint32(protocol[20:24])
+	if dataOffset < storageProtocolSpecificDataSize || dataLength < 512 {
+		return nil, fmt.Errorf("invalid NVMe property data offset=%d length=%d", dataOffset, dataLength)
+	}
+	start := uint64(storagePropertyQueryHeaderBytes) + uint64(dataOffset)
+	end := start + 512
+	if end > uint64(returned) || end > uint64(len(buf)) {
+		return nil, fmt.Errorf("NVMe property data outside response: offset=%d returned=%d", dataOffset, returned)
+	}
+	return append([]byte(nil), buf[start:end]...), nil
+}
+
+func issueNVMeHealthLogPropertyQuery(h windows.Handle) ([]byte, error) {
+	query := buildNVMeHealthLogPropertyQuery()
+	out := make([]byte, nvmeHealthPropertyResponseBytes+512)
+	var returned uint32
+	if err := windows.DeviceIoControl(h, IOCTL_STORAGE_QUERY_PROPERTY,
+		&query[0], uint32(len(query)), &out[0], uint32(len(out)), &returned, nil); err != nil {
+		return nil, fmt.Errorf("IOCTL_STORAGE_QUERY_PROPERTY NVMe Health Log: %w", err)
+	}
+	return parseNVMeHealthLogPropertyResponse(out, returned)
 }
 
 func issueNVMeAdminCommand(h windows.Handle, buf []byte, dataLen int, operation string) ([]byte, error) {
@@ -221,14 +278,29 @@ func ReadNVMeHealth(h windows.Handle) ([]Attr, error) {
 // controller-declared composite-temperature thresholds. Identify failures do
 // not discard otherwise valid health data.
 func ReadNVMeHealthWithThresholds(h windows.Handle) ([]Attr, uint64, uint64, error) {
+	attrs, warningK, criticalK, _, err := ReadNVMeHealthWithThresholdsAndTransport(h)
+	return attrs, warningK, criticalK, err
+}
+
+// ReadNVMeHealthWithThresholdsAndTransport reads standard NVMe health data
+// through the protocol-command path first, then the standard storage-property
+// query path. The latter helps controllers that expose the log through Windows
+// storage properties but reject direct protocol commands.
+func ReadNVMeHealthWithThresholdsAndTransport(h windows.Handle) ([]Attr, uint64, uint64, string, error) {
 	data, err := issueNVMeGetLogPage(h, NVMeLogID_SMART_Health)
+	transport := "NVMe protocol command"
 	if err != nil {
-		return nil, 0, 0, err
+		protocolErr := err
+		data, err = issueNVMeHealthLogPropertyQuery(h)
+		transport = "NVMe storage property query"
+		if err != nil {
+			return nil, 0, 0, "", fmt.Errorf("NVMe protocol command: %v; storage property query: %w", protocolErr, err)
+		}
 	}
 	attrs := parseNVMeHealthLog(data)
 	identify, identifyErr := issueNVMeIdentifyController(h)
 	if identifyErr != nil {
-		return attrs, 0, 0, nil
+		return attrs, 0, 0, transport, nil
 	}
 	warningK, criticalK := parseNVMeCompositeTemperatureThresholds(identify)
 	if warningK > 0 {
@@ -237,9 +309,8 @@ func ReadNVMeHealthWithThresholds(h windows.Handle) ([]Attr, uint64, uint64, err
 	if criticalK > 0 {
 		attrs = append(attrs, Attr{ID: NVMeCriticalCompositeTempThreshold, Name: "Critical_Composite_Temperature_Threshold_Kelvin", Raw: criticalK, Kind: "nvme"})
 	}
-	return attrs, warningK, criticalK, nil
+	return attrs, warningK, criticalK, transport, nil
 }
 
 // NVMeIdentify 通过 IOCTL_STORAGE_QUERY_PROPERTY 获取 NVMe 型号/序列号（更可靠）。
 // 这里返回由 enum.go 调用方填充，本文件只负责健康日志。
-var _ = unsafe.Pointer(nil) // 保留 unsafe 导入
