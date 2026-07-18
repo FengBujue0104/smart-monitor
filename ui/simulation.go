@@ -9,11 +9,14 @@ func SimulatedFailureDisks() []smart.Disk {
 		{
 			Index: 10,
 			Kind:  smart.KindATA,
-			Model: "SIMULATED ATA FAILURE",
+			// The model intentionally matches the supported WD Blue SA510 rule,
+			// so this GUI fixture also verifies its remaining-life warning.
+			Model: "SIMULATED WD Blue SA510 FAILURE",
 			Attrs: []smart.Attr{
 				{ID: 0x05, Name: "Reallocated_Sector_Ct", Raw: 2, Kind: "ata"},
 				{ID: 0xC2, Name: "Temperature_Celsius", Raw: 61, Kind: "ata"},
 				{ID: 0xBC, Name: "Command_Timeout", Raw: 11, Kind: "ata"},
+				{ID: 0xE6, Name: "Media_Wearout_Indicator", Raw: 0x5F00, Kind: "ata"}, // 5% remaining
 				{ID: 0xAA, Name: "Vendor_PreFail", Flags: 0x0001, Value: 10, Thresh: 10, Kind: "ata"},
 				{ID: 0x09, Name: "Power_On_Hours", Raw: 1000, Kind: "ata"},
 			},

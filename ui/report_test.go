@@ -210,10 +210,10 @@ func TestSimulationFixtureLoadsExpectedGUIState(t *testing.T) {
 	if err := rw.setReportData(SimulatedFailureDisks()); err != nil {
 		t.Fatalf("load simulated data: %v", err)
 	}
-	if len(rw.disks) != 2 || len(rw.violations) != 8 {
+	if len(rw.disks) != 2 || len(rw.violations) != 9 {
 		t.Fatalf("unexpected simulated GUI state: disks=%d violations=%d", len(rw.disks), len(rw.violations))
 	}
-	if report := buildExceptionReport(rw.disks, rw.violations); !strings.Contains(report, "SIMULATED ATA FAILURE") || !strings.Contains(report, "SIMULATED NVME FAILURE") {
+	if report := buildExceptionReport(rw.disks, rw.violations); !strings.Contains(report, "SIMULATED WD Blue SA510 FAILURE") || !strings.Contains(report, "5% (remaining)") || !strings.Contains(report, "SIMULATED NVME FAILURE") {
 		t.Fatalf("simulation feedback report missing disk: %q", report)
 	}
 }
