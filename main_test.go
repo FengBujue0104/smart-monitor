@@ -59,3 +59,12 @@ func TestMergeFallbackDisksKeepsSuccessfulTransport(t *testing.T) {
 		t.Fatalf("fallback transport/data was not used: %+v", got[0])
 	}
 }
+
+func TestMergeFallbackDisksCorrectsUnprobedUSBNVMeKind(t *testing.T) {
+	primary := []smart.Disk{{Index: 2, Kind: smart.KindATA, Model: "USB SSD", SMARTReadError: "ATA IOCTL failed"}}
+	fallback := []smart.Disk{{Index: 2, Kind: smart.KindNVMe, Model: "NVMe SSD USB Device", SMARTReadError: "WMI fallback does not expose an NVMe Health Log"}}
+	got := mergeFallbackDisks(primary, fallback)
+	if len(got) != 1 || got[0].Kind != smart.KindNVMe || got[0].SMARTReadError != fallback[0].SMARTReadError {
+		t.Fatalf("USB NVMe classification was not corrected: %+v", got)
+	}
+}

@@ -31,7 +31,19 @@ func MergeFallbackDisks(primary, fallback []Disk) []Disk {
 	result := make([]Disk, 0, len(primary)+len(fallback))
 	for _, d := range primary {
 		seen[d.Index] = true
-		if f, ok := byIndex[d.Index]; ok && f.Kind == d.Kind {
+		if f, ok := byIndex[d.Index]; ok {
+			// A USB NVMe bridge may be exposed as ATA/SCSI by the native
+			// descriptor while WMI retains the NVMe model identity. If native
+			// probing obtained no attributes, prefer that safer classification.
+			if len(d.Attrs) == 0 && d.Kind != f.Kind && f.Kind == KindNVMe {
+				d.Kind = KindNVMe
+				d.SMARTTransport = f.SMARTTransport
+				d.SMARTReadError = f.SMARTReadError
+			}
+			if f.Kind != d.Kind {
+				result = append(result, d)
+				continue
+			}
 			primaryCorrupt := d.Kind == KindATA && d.SMARTChecksumKnown && !d.SMARTChecksumValid
 			fallbackCanReplace := len(d.Attrs) == 0 || (primaryCorrupt && f.SMARTChecksumKnown && f.SMARTChecksumValid)
 			if fallbackCanReplace && len(f.Attrs) > 0 {

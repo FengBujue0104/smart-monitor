@@ -119,7 +119,9 @@ func DiscoverWMI() ([]Disk, error) {
 }
 
 func classifyWMIDisk(drv wmiDiskDrive, instanceName string) DiskKind {
-	identity := strings.ToLower(drv.InterfaceType + " " + drv.PNPDeviceID + " " + instanceName)
+	// USB NVMe enclosures often report InterfaceType=USB/SCSI. Their PNP path
+	// or model is still commonly the only place Windows exposes "NVMe".
+	identity := strings.ToLower(drv.InterfaceType + " " + drv.PNPDeviceID + " " + drv.Model + " " + instanceName)
 	if strings.Contains(identity, "nvme") {
 		return KindNVMe
 	}

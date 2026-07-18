@@ -116,3 +116,10 @@ func TestClassifyWMIDiskDetectsNVMeWithoutSMARTDataInstance(t *testing.T) {
 		t.Fatalf("WMI disk kind = %q, want NVMe", got)
 	}
 }
+
+func TestClassifyWMIDiskDetectsUSBNVMeFromModel(t *testing.T) {
+	drv := wmiDiskDrive{InterfaceType: "USB", Model: "NVMe SSD USB Device"}
+	if got := classifyWMIDisk(drv, ""); got != KindNVMe {
+		t.Fatalf("USB NVMe model kind = %q, want %q", got, KindNVMe)
+	}
+}
