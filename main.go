@@ -38,23 +38,14 @@ func main() {
 		log.SetOutput(logFile)
 	}
 
-	// 优先使用 IOCTL：它能区分 ATA/NVMe，并按 PhysicalDrive 建立一对一关联。
-	// WMI 仅作为控制器不支持 IOCTL 时的兼容回退。
-	disks, err := smart.Discover()
-	if err != nil || len(disks) == 0 {
-		disks, err = smart.DiscoverWMI()
-		if err != nil {
-			if uiErr := ui.RunReportWithStatus(nil, nil, fmt.Sprintf("❌ 扫描失败：枚举磁盘失败: %v", err)); uiErr != nil {
-				log.Printf("UI error: %v", uiErr)
-			}
-			return
+	// 每次扫描均优先使用 IOCTL，并按同一套规则合并 WMI 回退；这让首次
+	// 扫描和 GUI 的“重新扫描”在 USB/RAID 控制器上的结果保持一致。
+	disks, err := smart.DiscoverWithFallback()
+	if err != nil {
+		if uiErr := ui.RunReportWithStatus(nil, nil, fmt.Sprintf("❌ 扫描失败：枚举磁盘失败: %v", err)); uiErr != nil {
+			log.Printf("UI error: %v", uiErr)
 		}
-	} else {
-		// IOCTL 可能无法打开 RAID、USB 桥接或权限受限的某一块物理盘。始终
-		// 合并 WMI 的枚举结果，既补齐缺失属性，也补回主路径完全未发现的磁盘。
-		if fallback, wmiErr := smart.DiscoverWMI(); wmiErr == nil {
-			disks = mergeFallbackDisks(disks, fallback)
-		}
+		return
 	}
 	if len(disks) == 0 {
 		if err := ui.RunReportWithStatus(nil, nil, "⚠ 未找到任何物理磁盘。"); err != nil {
@@ -71,40 +62,7 @@ func main() {
 }
 
 func mergeFallbackDisks(primary, fallback []smart.Disk) []smart.Disk {
-	byIndex := make(map[int]smart.Disk, len(fallback))
-	for _, d := range fallback {
-		byIndex[d.Index] = d
-	}
-	seen := make(map[int]bool, len(primary))
-	result := make([]smart.Disk, 0, len(primary)+len(fallback))
-	for _, d := range primary {
-		seen[d.Index] = true
-		if f, ok := byIndex[d.Index]; ok && f.Kind == d.Kind {
-			primaryCorrupt := d.Kind == smart.KindATA && d.SMARTChecksumKnown && !d.SMARTChecksumValid
-			fallbackCanReplace := len(d.Attrs) == 0 || (primaryCorrupt && f.SMARTChecksumKnown && f.SMARTChecksumValid)
-			if fallbackCanReplace && len(f.Attrs) > 0 {
-				d.Attrs = f.Attrs
-				// WMI 数据页带有完整页校验时，可明确用它替换损坏的 IOCTL 页。
-				if f.SMARTChecksumKnown {
-					d.SMARTChecksumKnown = true
-					d.SMARTChecksumValid = f.SMARTChecksumValid
-				}
-			}
-			// ATA pass-through 常能读取属性但不能返回 SMART RETURN STATUS。
-			// 此时用 WMI 的状态补齐；已由主路径成功读取的状态绝不覆盖。
-			if !d.SmartStatusKnown && f.SmartStatusKnown {
-				d.SmartStatusKnown = true
-				d.SmartStatusPassed = f.SmartStatusPassed
-			}
-		}
-		result = append(result, d)
-	}
-	for _, d := range fallback {
-		if !seen[d.Index] {
-			result = append(result, d)
-		}
-	}
-	return result
+	return smart.MergeFallbackDisks(primary, fallback)
 }
 
 // isAdmin checks the process token directly. Opening a physical drive is not a

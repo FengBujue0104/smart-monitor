@@ -44,3 +44,18 @@ func TestMergeFallbackDisksReplacesCorruptATASMARTData(t *testing.T) {
 		t.Fatalf("expected valid fallback SMART data: %+v", got)
 	}
 }
+
+func TestMergeFallbackDisksKeepsSuccessfulTransport(t *testing.T) {
+	primary := []smart.Disk{{Index: 0, Kind: smart.KindATA, SMARTTransport: "ATA IOCTL", Attrs: []smart.Attr{{ID: 5}}}}
+	fallback := []smart.Disk{{Index: 0, Kind: smart.KindATA, SMARTTransport: "WMI fallback", Attrs: []smart.Attr{{ID: 1}}}}
+	got := mergeFallbackDisks(primary, fallback)
+	if got[0].SMARTTransport != "ATA IOCTL" || got[0].Attrs[0].ID != 5 {
+		t.Fatalf("valid native transport/data was replaced: %+v", got[0])
+	}
+
+	primary[0].Attrs = nil
+	got = mergeFallbackDisks(primary, fallback)
+	if got[0].SMARTTransport != "WMI fallback" || got[0].Attrs[0].ID != 1 {
+		t.Fatalf("fallback transport/data was not used: %+v", got[0])
+	}
+}

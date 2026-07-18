@@ -589,7 +589,9 @@ func (rw *ReportWin) rescan() {
 	// SMART IOCTL and WMI probing can take noticeable time on USB/RAID
 	// controllers. Keep that work outside Walk's UI thread, then marshal only
 	// the model replacement back to the window.
-	result := discoverAsync(smart.Discover)
+	// Match startup behavior: native IOCTL first, then WMI fallback for
+	// controllers such as USB/SCSI bridges and some RAID stacks.
+	result := discoverAsync(smart.DiscoverWithFallback)
 	go func() {
 		outcome := <-result
 		rw.Synchronize(func() {
