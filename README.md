@@ -36,7 +36,7 @@ Windows 10/11 兼容、单 .exe 分发。读取物理硬盘的 S.M.A.R.T 属性�
 | 其他未单列属性 | 厂商/设备特定 | `value <= device threshold` | Pre-fail=严重，Old-age=警告 |
 | 0xC2 Temperature | 温度 | > 60°C | 严重 |
 | 0xC2 Temperature | 温度 | > 55°C | 警告 |
-| 0xBC Command_Timeout | 命令超时 | raw != 0 | 警告 |
+| 0xBC Command_Timeout | 命令超时 | raw > 10 | 警告 |
 | 0xE9 Media_Wearout_Indicator | SSD 寿命 | <= 10% 严重；<= 20% 警告 |
 | 0xE8 Available_Reservd_Space | 预留块/寿命 | <= 10% | 警告 |
 
@@ -57,7 +57,7 @@ ATA SMART 数据页校验和异常会作为数据完整性警告显示，并触�
 ## 严谨性说明
 
 - **0x01 Read Error Rate 在 WD/Seagate 健康盘上 raw 也几乎必非零**（WD 是打包复合值，Seagate 低 32 位计可纠正 ECC），因此只按设备报告的归一化阈值判定。
-- **0x0E / 0xBC 在 ATA 规范中未统一定义**；0x0E 不设默认告警，0xBC 的非零值作为兼容性警告显示。
+- **0x0E / 0xBC 在 ATA 规范中未统一定义**；0x0E 不设默认告警，0xBC 的累计值超过 10 时作为兼容性警告显示。
 - **0x05 与 0xBB** 是 ATA 失效的最可靠指标，任何非零均视为风险。
 - **NVMe 路径**中的 "Media and Data Integrity Errors" 字段才是用户定义的 0E 语义在 NVMe 中的真正对应。
 

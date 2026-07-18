@@ -37,6 +37,23 @@ func TestATAAlternateTemperatureAttributesUseTemperatureThresholds(t *testing.T)
 	}
 }
 
+func TestATACommandTimeoutWarnsOnlyAfterTenEvents(t *testing.T) {
+	for _, test := range []struct {
+		raw  uint64
+		want int
+	}{
+		{raw: 1, want: 0},
+		{raw: 10, want: 0},
+		{raw: 11, want: 1},
+	} {
+		d := smart.Disk{Index: 0, Kind: smart.KindATA, Attrs: []smart.Attr{{ID: 0xBC, Raw: test.raw}}}
+		got := Evaluate([]smart.Disk{d})
+		if len(got) != test.want {
+			t.Fatalf("Command_Timeout raw=%d: got %d violations, want %d (%+v)", test.raw, len(got), test.want, got)
+		}
+	}
+}
+
 func TestATAOverallSMARTFailureCreatesCriticalViolation(t *testing.T) {
 	d := smart.Disk{Index: 0, Kind: smart.KindATA, SmartStatusKnown: true, SmartStatusPassed: false}
 	got := Evaluate([]smart.Disk{d})

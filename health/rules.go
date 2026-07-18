@@ -155,8 +155,10 @@ func evaluateATA(d smart.Disk) []Violation {
 				add(a, Warning, its(tempCur)+"°C", "≤ 55°C")
 			}
 		case 0xBC: // Command_Timeout
-			if a.Raw != 0 {
-				add(a, Warning, u64s(a.Raw), "= 0")
+			// A single historical timeout does not indicate current failure.
+			// Only flag a sustained timeout count, matching the documented rule.
+			if a.Raw > 10 {
+				add(a, Warning, u64s(a.Raw), "≤ 10")
 			}
 		case 0xE9: // Media_Wearout_Indicator (100=新, 0=耗尽)
 			// 该属性的 raw 可能是写入量/厂商复合值，寿命使用归一化 Value。
