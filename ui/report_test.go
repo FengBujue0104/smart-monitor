@@ -44,7 +44,8 @@ func TestAttrDisplaySeparatesRawAndNormalizedValues(t *testing.T) {
 	if got := attrRawStr(smart.Attr{ID: smart.NVMeEnduranceGroupCriticalWarning, Raw: 4, Kind: "nvme"}); got != "0x04" {
 		t.Fatalf("unexpected NVMe critical warning display: %q", got)
 	}
-	if got := attrRawStrForModel("KIOXIA-EXCERIA SATA SSD", smart.Attr{ID: 0xF1, Raw: 24824, Kind: "ata"}); got != "12412 GB (24824 × 512 MB)" {
+	// Raw 0x000000060F8A is from CrystalDiskInfo_20260718090515.txt.
+	if got := attrRawStrForModel("KIOXIA-EXCERIA SATA SSD", smart.Attr{ID: 0xF1, Raw: 0x060F8A, Kind: "ata"}); got != "12412 GB (397194 × 32 MB)" {
 		t.Fatalf("unexpected KIOXIA host writes display: %q", got)
 	}
 	if got := attrRawStrForModel("WD Blue SA510 2.5 500GB SSD", smart.Attr{ID: 0xF2, Raw: 13631, Kind: "ata"}); got != "13631 GB" {

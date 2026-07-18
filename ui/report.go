@@ -372,8 +372,9 @@ func attrRawStrForModel(model string, a smart.Attr) string {
 		m := strings.ToLower(model)
 		switch {
 		case strings.Contains(m, "kioxia") && a.ID == 0xF1:
-			// KIOXIA SATA reports host writes in 512 MB units.
-			return fmt.Sprintf("%.0f GB (%d × 512 MB)", float64(a.Raw)/2, a.Raw)
+			// CrystalDiskInfo's IsSsdKioxia selects 32 MB host I/O units;
+			// its F1 handling converts the raw counter to GB by dividing by 32.
+			return fmt.Sprintf("%d GB (%d × 32 MB)", a.Raw/32, a.Raw)
 		case strings.Contains(m, "wd blue") && (a.ID == 0xF1 || a.ID == 0xF2):
 			// WD Blue SA510 exposes these counters directly in GB.
 			return fmt.Sprintf("%d GB", a.Raw)
