@@ -371,6 +371,10 @@ func attrRawStrForModel(model string, a smart.Attr) string {
 		}
 		m := strings.ToLower(model)
 		switch {
+		case smart.IsSamsungSATASSDModel(model) && (a.ID == 0xF1 || a.ID == 0xF2):
+			// CrystalDiskInfo uses 512-byte LBA units for Samsung SATA F1/F2.
+			// SM951 is NVMe and is handled by the NVMe path, not this ATA path.
+			return fmt.Sprintf("%.2f GiB (%d × 512 B)", float64(a.Raw)/(2*1024*1024), a.Raw)
 		case strings.Contains(m, "kioxia") && a.ID == 0xF1:
 			// CrystalDiskInfo's IsSsdKioxia selects 32 MB host I/O units;
 			// its F1 handling converts the raw counter to GB by dividing by 32.

@@ -116,6 +116,9 @@ func TestATAAttrNameForModelCrystalDiskInfoAliases(t *testing.T) {
 	if got := ATAAttrNameForModel("ZHITAI TiPlus5000", 0xF1); got != "Host_Writes" {
 		t.Fatalf("ZHITAI F1 alias = %q", got)
 	}
+	if got := ATAAttrNameForModel("Samsung SSD 870 EVO 1TB", 0xF2); got != "Host_Reads" {
+		t.Fatalf("Samsung F2 alias = %q", got)
+	}
 	if got := ATAAttrNameForModel("Intel SSD DC S3500", 0xF3); got == "Temperature_Celsius" {
 		t.Fatalf("Intel F3 must not be interpreted as temperature")
 	}
@@ -152,5 +155,12 @@ func TestATAHealthPercentForVerifiedCrystalDiskInfoModels(t *testing.T) {
 	}
 	if _, ok := ATAHealthPercentForModel("Generic SSD", wd); ok {
 		t.Fatal("generic E6 must not be assigned a vendor health percentage")
+	}
+	samsung := []Attr{{ID: 0xB1, Value: 97}}
+	if got, ok := ATAHealthPercentForModel("Samsung SSD 870 EVO 1TB", samsung); !ok || got != 97 {
+		t.Fatalf("Samsung B1 health = %d, %v; want 97, true", got, ok)
+	}
+	if _, ok := ATAHealthPercentForModel("SAMSUNG HD502HJ", samsung); ok {
+		t.Fatal("Samsung HDD B1 must not use the SSD health rule")
 	}
 }

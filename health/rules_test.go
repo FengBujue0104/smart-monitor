@@ -94,6 +94,29 @@ func TestWDBlueSA510MediaWearoutUsesCrystalDiskInfoLifeRule(t *testing.T) {
 	}
 }
 
+func TestSamsungSATASSDB1UsesRemainingLifeRule(t *testing.T) {
+	for _, test := range []struct {
+		value    int
+		want     int
+		severity Severity
+	}{
+		{value: 97, want: 0},
+		{value: 5, want: 1, severity: Warning},
+		{value: 0, want: 1, severity: Critical},
+	} {
+		d := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "Samsung SSD 870 EVO 1TB", Attrs: []smart.Attr{{ID: 0xB1, Value: test.value}}}
+		got := Evaluate([]smart.Disk{d})
+		if len(got) != test.want || (test.want > 0 && got[0].Severity != test.severity) {
+			t.Fatalf("Samsung B1 value=%d: got %+v", test.value, got)
+		}
+	}
+
+	hdd := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "SAMSUNG HD502HJ", Attrs: []smart.Attr{{ID: 0xB1, Value: 0}}}
+	if got := Evaluate([]smart.Disk{hdd}); len(got) != 0 {
+		t.Fatalf("Samsung HDD B1 must not use SSD life rule: %+v", got)
+	}
+}
+
 // TestCrystalDiskInfoExportedHealthyDisksRemainHealthy is a regression fixture
 // transcribed from CrystalDiskInfo_20260718090515.txt. CrystalDiskInfo reports
 // KIOXIA-EXCERIA at 96% and WD Blue SA510 at 98%, both in good condition.

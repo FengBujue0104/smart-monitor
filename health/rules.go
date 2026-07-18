@@ -186,6 +186,18 @@ func evaluateATA(d smart.Disk) []Violation {
 				add(a, Warning, its(a.Value)+"%", "> 10%")
 			}
 		case 0xAD, 0xB1: // Wear_Leveling_Count
+			if a.ID == 0xB1 {
+				// CrystalDiskInfo identifies Samsung B1 as remaining life and
+				// uses its default caution threshold of 10%.
+				if life, ok := smart.ATAHealthPercentForModel(d.Model, []smart.Attr{a}); ok {
+					if life == 0 {
+						add(a, Critical, "0% (remaining)", "> 0%")
+					} else if life <= 10 {
+						add(a, Warning, its(life)+"% (remaining)", "> 10%")
+					}
+					break
+				}
+			}
 			// 低归一化值提示磨损
 			if a.Thresh > 0 && a.Value <= a.Thresh {
 				add(a, Warning, its(a.Value), "≥ "+its(a.Thresh))

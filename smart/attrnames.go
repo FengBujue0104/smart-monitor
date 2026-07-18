@@ -80,7 +80,7 @@ func ATAAttrNameForModel(model string, id int) string {
 		case 0xF4:
 			return "Thermal_Throttle_Status"
 		}
-	case strings.Contains(m, "samsung"):
+	case IsSamsungSATASSDModel(model):
 		switch id {
 		case 0xB1:
 			return "Wear_Leveling_Count"
@@ -92,6 +92,10 @@ func ATAAttrNameForModel(model string, id int) string {
 			return "Erase_Fail_Count"
 		case 0xE8:
 			return "Available_Reserved_Space"
+		case 0xF1:
+			return "Host_Writes"
+		case 0xF2:
+			return "Host_Reads"
 		}
 	case strings.Contains(m, "western digital") || strings.Contains(m, "wd "):
 		switch id {
@@ -135,6 +139,14 @@ func IsYMTCSATAModel(model string) bool {
 	return strings.Contains(m, "zhitai") || strings.Contains(model, "致态")
 }
 
+// IsSamsungSATASSDModel limits Samsung SMART interpretations to models that
+// identify as SSDs. This avoids applying SSD-only B1/F1/F2 meanings to older
+// Samsung hard drives, whose vendor attributes have different semantics.
+func IsSamsungSATASSDModel(model string) bool {
+	m := strings.ToLower(strings.TrimSpace(model))
+	return strings.Contains(m, "samsung ssd") || strings.Contains(m, "samsung mz") || strings.HasPrefix(m, "mz-")
+}
+
 // ATAHealthPercentForModel returns a vendor-defined remaining-life percentage
 // only where the interpretation is verified by CrystalDiskInfo and a model
 // match. The ATA standard does not assign a universal SSD-life attribute.
@@ -155,6 +167,12 @@ func ATAHealthPercentForModel(model string, attrs []Attr) (int, bool) {
 			life := 100 - int((a.Raw>>8)&0xFF)
 			if life >= 0 && life <= 100 {
 				return life, true
+			}
+		case IsSamsungSATASSDModel(model) && a.ID == 0xB1:
+			// CrystalDiskInfo's Samsung B1 life rule uses the normalized
+			// current value directly as the remaining-life percentage.
+			if a.Value >= 0 && a.Value <= 100 {
+				return a.Value, true
 			}
 		}
 	}
