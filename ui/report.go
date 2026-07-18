@@ -396,6 +396,10 @@ func attrRawStrForModel(model string, a smart.Attr) string {
 			// CrystalDiskInfo's IsSsdMicronMU03 selects 32 MB units for
 			// matching Crucial MX/BX SATA families.
 			return fmt.Sprintf("%d GB (%d × 32 MB)", a.Raw/32, a.Raw)
+		case smart.IsIntelOrSolidigmSATAModel(model) && (a.ID == 0xF1 || a.ID == 0xF3):
+			// CrystalDiskInfo converts Intel F1 host writes and F3 NAND writes
+			// from 32 MB units to GB. F3 temperature is YMTC-only.
+			return fmt.Sprintf("%d GB (%d × 32 MB)", a.Raw/32, a.Raw)
 		case strings.Contains(m, "kioxia") && a.ID == 0xF1:
 			// CrystalDiskInfo's IsSsdKioxia selects 32 MB host I/O units;
 			// its F1 handling converts the raw counter to GB by dividing by 32.

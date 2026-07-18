@@ -104,6 +104,13 @@ func ATAAttrNameForModel(model string, id int) string {
 		case 0xF2:
 			return "Host_Reads"
 		}
+	case IsIntelOrSolidigmSATAModel(model):
+		switch id {
+		case 0xF1:
+			return "Host_Writes"
+		case 0xF3:
+			return "NAND_Writes"
+		}
 	case strings.Contains(m, "western digital") || strings.Contains(m, "wd "):
 		switch id {
 		case 0xC4:
@@ -164,6 +171,13 @@ func IsCrucial32MBHostCounterModel(model string) bool {
 		}
 	}
 	return false
+}
+
+// IsIntelOrSolidigmSATAModel matches the vendor identification used by
+// CrystalDiskInfo's Intel SMART handling. NVMe devices use a separate path.
+func IsIntelOrSolidigmSATAModel(model string) bool {
+	m := strings.ToLower(model)
+	return strings.Contains(m, "intel") || strings.Contains(m, "solidigm")
 }
 
 // ATAHealthPercentForModel returns a vendor-defined remaining-life percentage
