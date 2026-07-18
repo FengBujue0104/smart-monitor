@@ -14,6 +14,46 @@ func BuildTextReportForTest(disks []smart.Disk, vs []health.Violation) string {
 	return buildTextReport(disks, vs)
 }
 
+// BuildExceptionReportForTest exposes the concise feedback-table report used
+// by the copy button.
+func BuildExceptionReportForTest(disks []smart.Disk, vs []health.Violation) string {
+	return buildExceptionReport(disks, vs)
+}
+
+// buildExceptionReport returns a tab-separated exception list suitable for
+// pasting directly into a feedback spreadsheet. It intentionally excludes all
+// healthy SMART attributes and other verbose diagnostic data.
+func buildExceptionReport(disks []smart.Disk, vs []health.Violation) string {
+	if len(vs) == 0 {
+		return "未检测到 S.M.A.R.T 异常。\n"
+	}
+	models := make(map[int]string, len(disks))
+	for _, d := range disks {
+		models[d.Index] = d.Model
+	}
+	var b strings.Builder
+	b.WriteString("磁盘号\t型号\t异常项目\t当前值\t阈值\t级别\n")
+	for _, v := range vs {
+		model := v.DiskModel
+		if model == "" {
+			model = models[v.DiskIndex]
+		}
+		level := "警告"
+		if v.Severity == health.Critical {
+			level = "严重"
+		}
+		b.WriteString(fmt.Sprintf("Disk%d\t%s\t%s\t%s\t%s\t%s\n",
+			v.DiskIndex, feedbackField(model), feedbackField(v.AttrName), feedbackField(v.Current), feedbackField(v.Limit), level))
+	}
+	return b.String()
+}
+
+func feedbackField(s string) string {
+	s = strings.ReplaceAll(s, "\t", " ")
+	s = strings.ReplaceAll(s, "\r", " ")
+	return strings.ReplaceAll(s, "\n", " ")
+}
+
 // buildTextReport 生成适合粘贴的纯文本报表（UTF-16 LE 由 clipboard 层处理）。
 func buildTextReport(disks []smart.Disk, vs []health.Violation) string {
 	var b strings.Builder

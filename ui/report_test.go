@@ -141,3 +141,25 @@ func TestVirtualDiskIsNotReportedAsUnreadSMART(t *testing.T) {
 		t.Fatalf("unexpected virtual disk report: %q", got)
 	}
 }
+
+func TestReportModelEventsRemainStableAcrossTableModelReplacement(t *testing.T) {
+	m := &reportModel{}
+	if m.RowsReset() != m.RowsReset() || m.RowChanged() != m.RowChanged() || m.RowsChanged() != m.RowsChanged() || m.RowsInserted() != m.RowsInserted() || m.RowsRemoved() != m.RowsRemoved() {
+		t.Fatal("report model must return stable event instances")
+	}
+}
+
+func TestBuildExceptionReportContainsOnlyFeedbackRows(t *testing.T) {
+	disks := []smart.Disk{{Index: 1, Model: "Test SSD\tModel", Attrs: []smart.Attr{{ID: 9, Name: "Power_On_Hours"}}}}
+	vs := []health.Violation{{DiskIndex: 1, AttrName: "Command_Timeout", Current: "11", Limit: "≤ 10", Severity: health.Warning}}
+	got := buildExceptionReport(disks, vs)
+	if !strings.HasPrefix(got, "磁盘号\t型号\t异常项目\t当前值\t阈值\t级别\n") || !strings.Contains(got, "Disk1\tTest SSD Model\tCommand_Timeout\t11\t≤ 10\t警告\n") {
+		t.Fatalf("unexpected exception report: %q", got)
+	}
+	if strings.Contains(got, "Power_On_Hours") {
+		t.Fatalf("healthy attribute leaked into exception report: %q", got)
+	}
+	if got := buildExceptionReport(disks, nil); got != "未检测到 S.M.A.R.T 异常。\n" {
+		t.Fatalf("unexpected clean exception report: %q", got)
+	}
+}

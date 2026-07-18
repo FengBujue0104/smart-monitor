@@ -69,7 +69,7 @@ func RunReport(disks []smart.Disk, violations []health.Violation) error {
 				Layout: HBox{MarginsZero: true},
 				Children: []Widget{
 					PushButton{
-						Text:      "一键复制报表",
+						Text:      "复制异常条目",
 						MinSize:   Size{Width: 140, Height: 30},
 						OnClicked: func() { rw.copyReport() },
 					},
@@ -103,10 +103,15 @@ func RunReport(disks []smart.Disk, violations []health.Violation) error {
 // ===== 表格模型 =====
 
 type reportModel struct {
-	disks      []smart.Disk
-	violations []health.Violation
-	rows       []reportRow
-	built      bool
+	disks        []smart.Disk
+	violations   []health.Violation
+	rows         []reportRow
+	built        bool
+	rowsReset    walk.Event
+	rowChanged   walk.IntEvent
+	rowsChanged  walk.IntRangeEvent
+	rowsInserted walk.IntRangeEvent
+	rowsRemoved  walk.IntRangeEvent
 }
 
 type reportRow struct {
@@ -214,12 +219,13 @@ func (m *reportModel) RowCount() int {
 	return len(m.rows)
 }
 
-// 事件方法（静态数据，事件永不触发，返回空事件即可）。
-func (m *reportModel) RowsReset() *walk.Event            { return &walk.Event{} }
-func (m *reportModel) RowChanged() *walk.IntEvent        { return &walk.IntEvent{} }
-func (m *reportModel) RowsChanged() *walk.IntRangeEvent  { return &walk.IntRangeEvent{} }
-func (m *reportModel) RowsInserted() *walk.IntRangeEvent { return &walk.IntRangeEvent{} }
-func (m *reportModel) RowsRemoved() *walk.IntRangeEvent  { return &walk.IntRangeEvent{} }
+// 事件必须在模型整个生命周期内保持同一实例。TableView 更换模型时会从
+// 旧事件解绑；若每次返回新事件，Walk 会因解绑空处理器列表而发生 panic。
+func (m *reportModel) RowsReset() *walk.Event            { return &m.rowsReset }
+func (m *reportModel) RowChanged() *walk.IntEvent        { return &m.rowChanged }
+func (m *reportModel) RowsChanged() *walk.IntRangeEvent  { return &m.rowsChanged }
+func (m *reportModel) RowsInserted() *walk.IntRangeEvent { return &m.rowsInserted }
+func (m *reportModel) RowsRemoved() *walk.IntRangeEvent  { return &m.rowsRemoved }
 
 func (m *reportModel) Value(row, col int) interface{} {
 	m.build()
@@ -490,12 +496,16 @@ func alertBannerColor(disks []smart.Disk, vs []health.Violation) walk.Color {
 // ===== 行为 =====
 
 func (rw *ReportWin) copyReport() {
-	rpt := buildTextReport(rw.disks, rw.violations)
+	rpt := buildExceptionReport(rw.disks, rw.violations)
 	if err := WriteText(rpt); err != nil {
 		walk.MsgBox(rw, "复制失败", err.Error(), walk.MsgBoxIconError)
 		return
 	}
-	walk.MsgBox(rw, "复制成功", "报表已复制到剪贴板。", walk.MsgBoxIconInformation)
+	message := "异常条目已复制到剪贴板，可直接粘贴到反馈表格。"
+	if len(rw.violations) == 0 {
+		message = "当前未发现异常，已复制状态提示。"
+	}
+	walk.MsgBox(rw, "复制成功", message, walk.MsgBoxIconInformation)
 }
 
 func (rw *ReportWin) rescan() {
@@ -511,7 +521,10 @@ func (rw *ReportWin) rescan() {
 		rw.banner.SetTextColor(alertBannerColor(disks, rw.violations))
 	}
 	if rw.tv != nil {
-		rw.tv.SetModel(&reportModel{disks: disks, violations: rw.violations})
+		if err := rw.tv.SetModel(&reportModel{disks: disks, violations: rw.violations}); err != nil {
+			walk.MsgBox(rw, "刷新失败", err.Error(), walk.MsgBoxIconError)
+			return
+		}
 	}
 }
 
