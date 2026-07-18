@@ -17,6 +17,58 @@ func ATAAttrNameForModel(model string, id int) string {
 	name := ATAAttrName(id)
 	m := strings.ToLower(model)
 	switch {
+	case strings.Contains(m, "kioxia"):
+		switch id {
+		case 0xA7:
+			return "SSD_Protection_Mode"
+		case 0xA8:
+			return "SATA_PHY_Error_Count"
+		case 0xA9:
+			return "Bad_Block_Count"
+		case 0xAD:
+			return "Erase_Count_User_Data"
+		case 0xC0:
+			return "Unexpected_Power_Loss_Count"
+		case 0xF1:
+			return "Host_Writes"
+		}
+	case strings.Contains(m, "wd blue"):
+		switch id {
+		case 0xA5:
+			return "Block_Erase_Count_SLC"
+		case 0xA6:
+			return "Min_PE_Cycles"
+		case 0xA7:
+			return "Max_Bad_Blocks_Per_Die"
+		case 0xA8:
+			return "Max_PE_Cycles"
+		case 0xA9:
+			return "Total_Bad_Blocks"
+		case 0xAA:
+			return "New_Bad_Blocks"
+		case 0xAB:
+			return "Program_Fail_Count"
+		case 0xAC:
+			return "Erase_Fail_Count"
+		case 0xAD:
+			return "Average_PE_Cycles"
+		case 0xAE:
+			return "Unexpected_Power_Loss_Count"
+		case 0xE6:
+			return "Media_Wearout_Indicator"
+		case 0xE8:
+			return "Available_Reserved_Space"
+		case 0xE9:
+			return "NAND_Writes"
+		case 0xEA:
+			return "NAND_Writes_SLC"
+		case 0xF1:
+			return "Host_Writes_GB"
+		case 0xF2:
+			return "Host_Reads_GB"
+		case 0xF4:
+			return "Thermal_Throttle_Status"
+		}
 	case strings.Contains(m, "samsung"):
 		switch id {
 		case 0xB1:

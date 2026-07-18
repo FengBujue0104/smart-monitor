@@ -86,7 +86,7 @@ func buildTextReport(disks []smart.Disk, vs []health.Violation) string {
 				}
 			}
 			b.WriteString(fmt.Sprintf("  %s 0x%02X %-30s flags=%s raw=%s  val=%s worst=%s thresh=%s\n",
-				mark, a.ID, a.Name, attrFlagsStr(a), attrRawStr(a), attrCurrentStr(a), attrWorstStr(a), threshStr(a.Thresh)))
+				mark, a.ID, a.Name, attrFlagsStr(a), attrRawStrForModel(d.Model, a), attrCurrentStr(a), attrWorstStr(a), threshStr(a.Thresh)))
 		}
 		b.WriteString("\n")
 	}

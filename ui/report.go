@@ -192,7 +192,7 @@ func (m *reportModel) build() {
 				id:       a.ID,
 				flags:    attrFlagsStr(a),
 				name:     a.Name,
-				raw:      attrRawStr(a),
+				raw:      attrRawStrForModel(d.Model, a),
 				current:  attrCurrentStr(a),
 				worst:    attrWorstStr(a),
 				limit:    threshStr(a.Thresh),
@@ -333,6 +333,23 @@ func attrRawStr(a smart.Attr) string {
 		return fmt.Sprintf("%d", a.Raw)
 	}
 	return fmt.Sprintf("%d", a.Raw)
+}
+
+// attrRawStrForModel applies only the vendor/unit mappings verified against
+// CrystalDiskInfo reports. Unknown models retain the generic raw display.
+func attrRawStrForModel(model string, a smart.Attr) string {
+	if a.Kind == "ata" {
+		m := strings.ToLower(model)
+		switch {
+		case strings.Contains(m, "kioxia") && a.ID == 0xF1:
+			// KIOXIA SATA reports host writes in 512 MB units.
+			return fmt.Sprintf("%.0f GB (%d × 512 MB)", float64(a.Raw)/2, a.Raw)
+		case strings.Contains(m, "wd blue") && (a.ID == 0xF1 || a.ID == 0xF2):
+			// WD Blue SA510 exposes these counters directly in GB.
+			return fmt.Sprintf("%d GB", a.Raw)
+		}
+	}
+	return attrRawStr(a)
 }
 
 func nvmeCounterStr(a smart.Attr) string {

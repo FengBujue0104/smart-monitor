@@ -96,3 +96,18 @@ func TestParseSMARTThresholdsSupportsHeaderlessResponse(t *testing.T) {
 		t.Fatalf("unexpected headerless thresholds: %+v", thresholds)
 	}
 }
+
+func TestATAAttrNameForModelCrystalDiskInfoAliases(t *testing.T) {
+	if got := ATAAttrNameForModel("KIOXIA-EXCERIA SATA SSD", 0xA8); got != "SATA_PHY_Error_Count" {
+		t.Fatalf("KIOXIA A8 alias = %q", got)
+	}
+	if got := ATAAttrNameForModel("KIOXIA-EXCERIA SATA SSD", 0xF1); got != "Host_Writes" {
+		t.Fatalf("KIOXIA F1 alias = %q", got)
+	}
+	if got := ATAAttrNameForModel("WD Blue SA510 2.5 500GB SSD", 0xAC); got != "Erase_Fail_Count" {
+		t.Fatalf("WD Blue AC alias = %q", got)
+	}
+	if got := ATAAttrNameForModel("WD Blue SA510 2.5 500GB SSD", 0xF2); got != "Host_Reads_GB" {
+		t.Fatalf("WD Blue F2 alias = %q", got)
+	}
+}
