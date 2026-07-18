@@ -23,6 +23,21 @@ Windows 10/11 兼容、单 .exe 分发。读取物理硬盘的 S.M.A.R.T 属性�
 - **NVMe SSD**：`IOCTL_STORAGE_PROTOCOL_COMMAND`（Get Log Page 0x02，健康日志）。
 - 不需要 smartctl.exe / 不需要任何外部依赖。
 
+## 已验证的 CrystalDiskInfo 厂商兼容
+
+以下规则均有 CrystalDiskInfo 源码依据；未列出的型号保留 ATA/NVMe 的通用解释，不会猜测性套用厂商字段。
+
+| 型号范围 | 专用解释 |
+|---|---|
+| KIOXIA SATA SSD | `F1` 主机写入按 32 MB 单位；`AD` 显示健康度 |
+| WD Blue SA510 | `F1/F2/E9` 直接以 GB 显示；`E6` 显示健康度，≤10% 警告、0% 严重 |
+| 致态 / ZHITAI (YMTC) SATA | `F3` 为温度；`F1/F2` 按 512 B LBA 显示 |
+| Samsung SATA SSD | `B1` 为剩余寿命；`F1/F2` 按 512 B LBA 显示；不作用于 Samsung HDD |
+| Crucial MX/BX100/200/300/500 SATA | `F1/F2` 按 32 MB 单位显示 |
+| Intel / Solidigm SATA | `F1` 主机写入、`F3` NAND 写入均按 32 MB 单位显示 |
+
+`F3` 是典型厂商复用字段：YMTC 将其用作温度，而 Intel/Solidigm 将其用作 NAND 写入；未知型号只显示原始数值。
+
 ## 告警规则
 
 ### ATA
