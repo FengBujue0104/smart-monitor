@@ -15,6 +15,11 @@ func ATAAttrName(id int) string {
 // the numeric SMART attribute identity.
 func ATAAttrNameForModel(model string, id int) string {
 	name := ATAAttrName(id)
+	if profile := ataVendorProfileForModel(model); profile != nil {
+		if alias, ok := profile.aliases[id]; ok {
+			return alias
+		}
+	}
 	m := strings.ToLower(model)
 	switch {
 	case isYMTCSATA(model):
@@ -155,6 +160,9 @@ func ATAAttrNameForModel(model string, id int) string {
 // the current Celsius temperature. F3 is deliberately model-scoped: according
 // to CrystalDiskInfo, it is a temperature only on ZHITAI/YMTC SATA SSDs.
 func ATATemperatureAttributeForModel(model string, id int) bool {
+	if profile := ataVendorProfileForModel(model); profile != nil && profile.temperatureIDs[id] {
+		return true
+	}
 	switch id {
 	case 0xB9, 0xBE, 0xC2:
 		return true
@@ -235,59 +243,19 @@ const (
 // ATACounterUnitForModel centralizes source-verified CrystalDiskInfo counter
 // units. It intentionally returns false for unknown model/attribute pairs.
 func ATACounterUnitForModel(model string, id int) (ATACounterUnit, bool) {
-	m := strings.ToLower(model)
-	switch {
-	case IsYMTCSATAModel(model) && (id == 0xF1 || id == 0xF2):
-		return ATACounterUnit512B, true
-	case IsSamsungSATASSDModel(model) && (id == 0xF1 || id == 0xF2):
-		return ATACounterUnit512B, true
-	case strings.Contains(m, "kioxia") && id == 0xF1:
-		return ATACounterUnit32MB, true
-	case IsCrucial32MBHostCounterModel(model) && (id == 0xF1 || id == 0xF2):
-		return ATACounterUnit32MB, true
-	case IsIntelOrSolidigmSATAModel(model) && (id == 0xF1 || id == 0xF3):
-		return ATACounterUnit32MB, true
-	case IsKingstonKC600Model(model) && (id == 0xF1 || id == 0xF2):
-		return ATACounterUnit32MB, true
-	case IsToshiba32MBHostCounterModel(model) && (id == 0xF1 || id == 0xF2):
-		return ATACounterUnit32MB, true
-	case strings.Contains(m, "wd blue sa510") && (id == 0xE9 || id == 0xF1 || id == 0xF2):
-		return ATACounterUnitGB, true
-	case strings.Contains(m, "seagate") && (id == 0xE9 || id == 0xEA || id == 0xF1 || id == 0xF2):
-		return ATACounterUnitGB, true
-	default:
-		return ATACounterUnitUnknown, false
+	if profile := ataVendorProfileForModel(model); profile != nil {
+		unit, ok := profile.counterUnits[id]
+		return unit, ok
 	}
+	return ATACounterUnitUnknown, false
 }
 
 // ATAHealthPercentForModel returns a vendor-defined remaining-life percentage
 // only where the interpretation is verified by CrystalDiskInfo and a model
 // match. The ATA standard does not assign a universal SSD-life attribute.
 func ATAHealthPercentForModel(model string, attrs []Attr) (int, bool) {
-	m := strings.ToLower(model)
-	for _, a := range attrs {
-		switch {
-		case strings.Contains(m, "kioxia") && a.ID == 0xAD:
-			// CrystalDiskInfo AtaSmart.cpp: KIOXIA AD stores life as
-			// normalized current value minus 100 (e.g. 196 -> 96%).
-			life := a.Value - 100
-			if life > 0 && life <= 100 {
-				return life, true
-			}
-		case strings.Contains(m, "wd blue sa510") && a.ID == 0xE6:
-			// CrystalDiskInfo's WDC E6 rule stores used percentage in
-			// raw byte 1; this was cross-checked with the exported SA510 report.
-			life := 100 - int((a.Raw>>8)&0xFF)
-			if life >= 0 && life <= 100 {
-				return life, true
-			}
-		case IsSamsungSATASSDModel(model) && a.ID == 0xB1:
-			// CrystalDiskInfo's Samsung B1 life rule uses the normalized
-			// current value directly as the remaining-life percentage.
-			if a.Value >= 0 && a.Value <= 100 {
-				return a.Value, true
-			}
-		}
+	if profile := ataVendorProfileForModel(model); profile != nil && profile.remainingHealth != nil {
+		return profile.remainingHealth(attrs)
 	}
 	return 0, false
 }

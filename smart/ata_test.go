@@ -216,3 +216,30 @@ func TestATACounterUnitForModelUsesVerifiedMappings(t *testing.T) {
 		}
 	}
 }
+
+func TestATAVendorProfilesUseSpecificMatchBeforeGenericMatch(t *testing.T) {
+	for _, test := range []struct {
+		model string
+		want  string
+	}{
+		{"WD Blue SA510 2.5 500GB SSD", "WD Blue SA510"},
+		{"WD Blue 3D NAND SATA SSD", "WD Blue SATA"},
+		{"KINGSTON SKC600512G", "Kingston KC600"},
+		{"Generic SATA SSD", ""},
+	} {
+		profile := ataVendorProfileForModel(test.model)
+		if test.want == "" {
+			if profile != nil {
+				t.Fatalf("profile for %q = %q, want none", test.model, profile.name)
+			}
+			continue
+		}
+		if profile == nil || profile.name != test.want {
+			got := ""
+			if profile != nil {
+				got = profile.name
+			}
+			t.Fatalf("profile for %q = %q, want %q", test.model, got, test.want)
+		}
+	}
+}
