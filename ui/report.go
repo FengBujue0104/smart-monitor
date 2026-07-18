@@ -400,6 +400,9 @@ func attrRawStrForModel(model string, a smart.Attr) string {
 			// CrystalDiskInfo converts Intel F1 host writes and F3 NAND writes
 			// from 32 MB units to GB. F3 temperature is YMTC-only.
 			return fmt.Sprintf("%d GB (%d × 32 MB)", a.Raw/32, a.Raw)
+		case smart.IsKingstonKC600Model(model) && (a.ID == 0xF1 || a.ID == 0xF2):
+			// CrystalDiskInfo's dedicated KC600 branch uses 32 MB units.
+			return fmt.Sprintf("%d GB (%d × 32 MB)", a.Raw/32, a.Raw)
 		case strings.Contains(m, "seagate") && (a.ID == 0xE9 || a.ID == 0xEA || a.ID == 0xF1 || a.ID == 0xF2):
 			// CrystalDiskInfo's Seagate branch uses direct GB counters for
 			// these host/NAND write and host read attributes.

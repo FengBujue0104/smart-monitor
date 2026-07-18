@@ -128,6 +128,9 @@ func TestATAAttrNameForModelCrystalDiskInfoAliases(t *testing.T) {
 	if got := ATAAttrNameForModel("Seagate ZA240CV10001", 0xEA); got != "NAND_Writes_SLC" {
 		t.Fatalf("Seagate EA alias = %q", got)
 	}
+	if got := ATAAttrNameForModel("KINGSTON SKC600512G", 0xF2); got != "Host_Reads" {
+		t.Fatalf("Kingston KC600 F2 alias = %q", got)
+	}
 	if got := ATAAttrNameForModel("Intel SSD DC S3500", 0xF3); got == "Temperature_Celsius" {
 		t.Fatalf("Intel F3 must not be interpreted as temperature")
 	}
@@ -156,6 +159,9 @@ func TestATATemperatureAttributeForModelLimitsF3ToYMTC(t *testing.T) {
 	}
 	if !IsIntelOrSolidigmSATAModel("INTEL SSDSC2BA200G3") || !IsIntelOrSolidigmSATAModel("Solidigm D3-S4510") || IsIntelOrSolidigmSATAModel("KIOXIA SATA SSD") {
 		t.Fatal("unexpected Intel/Solidigm model identification")
+	}
+	if !IsKingstonKC600Model("KINGSTON SKC600512G") || IsKingstonKC600Model("KINGSTON SA400S37") {
+		t.Fatal("unexpected Kingston KC600 model identification")
 	}
 }
 

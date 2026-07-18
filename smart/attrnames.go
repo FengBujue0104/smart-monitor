@@ -111,6 +111,13 @@ func ATAAttrNameForModel(model string, id int) string {
 		case 0xF3:
 			return "NAND_Writes"
 		}
+	case IsKingstonKC600Model(model):
+		switch id {
+		case 0xF1:
+			return "Host_Writes"
+		case 0xF2:
+			return "Host_Reads"
+		}
 	case strings.Contains(m, "western digital") || strings.Contains(m, "wd "):
 		switch id {
 		case 0xC4:
@@ -187,6 +194,12 @@ func IsCrucial32MBHostCounterModel(model string) bool {
 func IsIntelOrSolidigmSATAModel(model string) bool {
 	m := strings.ToLower(model)
 	return strings.Contains(m, "intel") || strings.Contains(m, "solidigm")
+}
+
+// IsKingstonKC600Model matches CrystalDiskInfo's Kingston KC600 branch,
+// which explicitly declares 32 MB host read/write units.
+func IsKingstonKC600Model(model string) bool {
+	return strings.Contains(strings.ToUpper(model), "KC600")
 }
 
 // ATAHealthPercentForModel returns a vendor-defined remaining-life percentage
