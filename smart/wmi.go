@@ -108,6 +108,10 @@ func DiscoverWMI() ([]Disk, error) {
 				th = nil
 			}
 			applyWMIATAData(&d, data, th)
+		} else if d.Kind == KindNVMe {
+			d.SMARTReadError = "WMI fallback does not expose an NVMe Health Log"
+		} else {
+			d.SMARTReadError = "WMI SMART provider did not return attributes"
 		}
 		disks = append(disks, d)
 	}

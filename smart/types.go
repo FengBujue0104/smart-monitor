@@ -69,6 +69,9 @@ type Disk struct {
 	// It is shown in the main report so a USB/RAID user can verify which
 	// compatibility path was actually used.
 	SMARTTransport string
+	// SMARTReadError explains why no attributes were obtained. It is diagnostic
+	// only: a missing SMART page must never be displayed as a healthy result.
+	SMARTReadError string
 	// 设备报告的整体 SMART 状态（ATA pass-through 或 WMI 预测状态）。
 	SmartStatusKnown  bool // 是否成功读取整体 SMART status
 	SmartStatusPassed bool // 整体 SMART status 是否通过

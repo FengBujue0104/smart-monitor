@@ -37,6 +37,7 @@ func MergeFallbackDisks(primary, fallback []Disk) []Disk {
 			if fallbackCanReplace && len(f.Attrs) > 0 {
 				d.Attrs = f.Attrs
 				d.SMARTTransport = f.SMARTTransport
+				d.SMARTReadError = f.SMARTReadError
 				if f.SMARTChecksumKnown {
 					d.SMARTChecksumKnown = true
 					d.SMARTChecksumValid = f.SMARTChecksumValid

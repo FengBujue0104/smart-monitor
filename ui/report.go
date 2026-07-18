@@ -201,6 +201,10 @@ func (m *reportModel) build() {
 			if d.Kind == smart.KindUnknown {
 				name, status = "SMART 不适用", "— 不适用"
 			}
+			current := "-"
+			if d.SMARTReadError != "" {
+				current = d.SMARTReadError
+			}
 			m.rows = append(m.rows, reportRow{
 				disk:     dname,
 				kind:     string(d.Kind),
@@ -208,7 +212,7 @@ func (m *reportModel) build() {
 				flags:    "-",
 				name:     name,
 				raw:      "-",
-				current:  "-",
+				current:  current,
 				worst:    "-",
 				limit:    "-",
 				status:   status,

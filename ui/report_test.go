@@ -154,6 +154,15 @@ func TestReportModelShowsDiskWhenSMARTDataIsUnavailable(t *testing.T) {
 	}
 }
 
+func TestReportModelShowsSMARTReadFailureReason(t *testing.T) {
+	m := &reportModel{disks: []smart.Disk{{
+		Index: 4, Kind: smart.KindNVMe, Model: "USB NVMe", SMARTReadError: "NVMe Health Log: access denied",
+	}}}
+	if got := m.Value(0, 6); got != "NVMe Health Log: access denied" {
+		t.Fatalf("SMART read failure reason = %q", got)
+	}
+}
+
 func TestTextReportDoesNotClaimHealthyWhenSMARTIsUnavailable(t *testing.T) {
 	report := buildTextReport([]smart.Disk{{Index: 1, Kind: smart.KindATA, Model: "Unavailable"}}, nil)
 	if !strings.Contains(report, "无法得出完整健康结论") || strings.Contains(report, "所有监测指标在安全范围内") {

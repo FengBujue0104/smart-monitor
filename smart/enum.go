@@ -175,6 +175,9 @@ func Discover() ([]Disk, error) {
 			if err != nil {
 				// 降级：仍返回空 Attrs 的盘
 				d.Kind = KindNVMe
+				d.SMARTReadError = "NVMe Health Log: " + err.Error()
+			} else {
+				d.SMARTTransport = "NVMe protocol command"
 			}
 			d.Attrs = attrs
 			d.NVMeWarningTempThresholdK = warningTempK
@@ -199,10 +202,14 @@ func Discover() ([]Disk, error) {
 			attrs, _, checksumValid, smErr := ReadSMARTDataDetailed(h, byte(i))
 			usedSAT := false
 			if smErr != nil {
+				nativeErr := smErr
 				// USB/SCSI bridges commonly reject SMART_RCV_DRIVE_DATA but expose
 				// the same read-only ATA SMART pages through standard SAT.
 				attrs, _, checksumValid, smErr = ReadSMARTDataSATDetailed(h)
 				usedSAT = smErr == nil
+				if smErr != nil {
+					d.SMARTReadError = fmt.Sprintf("ATA IOCTL: %v; SAT bridge: %v", nativeErr, smErr)
+				}
 			}
 			status, statusErr := ReadSMARTOverallStatus(h)
 			if statusErr == nil {
