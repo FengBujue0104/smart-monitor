@@ -517,35 +517,42 @@ func alertBannerColor(disks []smart.Disk, vs []health.Violation) walk.Color {
 func (rw *ReportWin) copyReport() {
 	rpt := buildExceptionReport(rw.disks, rw.violations)
 	if err := WriteText(rpt); err != nil {
-		walk.MsgBox(rw, "复制失败", err.Error(), walk.MsgBoxIconError)
+		rw.showStatus("复制失败："+err.Error(), walk.RGB(0xB0, 0x20, 0x20))
 		return
 	}
 	message := "异常条目已复制到剪贴板，可直接粘贴到反馈表格。"
 	if len(rw.violations) == 0 {
 		message = "当前未发现异常，已复制状态提示。"
 	}
-	walk.MsgBox(rw, "复制成功", message, walk.MsgBoxIconInformation)
+	rw.showStatus(message, walk.RGB(0x1B, 0x7A, 0x2F))
 }
 
 func (rw *ReportWin) rescan() {
 	disks, err := smart.Discover()
 	if err != nil {
-		walk.MsgBox(rw, "扫描失败", err.Error(), walk.MsgBoxIconError)
+		rw.showStatus("扫描失败："+err.Error(), walk.RGB(0xB0, 0x20, 0x20))
 		return
 	}
 	if err := rw.setReportData(disks); err != nil {
-		walk.MsgBox(rw, "刷新失败", err.Error(), walk.MsgBoxIconError)
+		rw.showStatus("刷新失败："+err.Error(), walk.RGB(0xB0, 0x20, 0x20))
 	}
 }
 
 func (rw *ReportWin) simulateFailures() {
 	if err := rw.setReportData(SimulatedFailureDisks()); err != nil {
-		walk.MsgBox(rw, "模拟失败", err.Error(), walk.MsgBoxIconError)
+		rw.showStatus("模拟失败："+err.Error(), walk.RGB(0xB0, 0x20, 0x20))
 		return
 	}
-	if rw.banner != nil {
-		_ = rw.banner.SetText("🧪 模拟异常验证（仅内存数据；点击“重新扫描”恢复真实磁盘）\n" + alertBannerText(rw.disks, rw.violations))
+	rw.showStatus("🧪 模拟异常验证（仅内存数据；点击“重新扫描”恢复真实磁盘）", walk.RGB(0xB0, 0x60, 0x00))
+}
+
+// showStatus 将操作结果直接写入主窗口横幅，避免模态对话框阻塞界面。
+func (rw *ReportWin) showStatus(message string, color walk.Color) {
+	if rw.banner == nil {
+		return
 	}
+	_ = rw.banner.SetText(message + "\n" + alertBannerText(rw.disks, rw.violations))
+	rw.banner.SetTextColor(color)
 }
 
 func (rw *ReportWin) setReportData(disks []smart.Disk) error {
