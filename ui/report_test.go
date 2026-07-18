@@ -209,6 +209,14 @@ func TestAlertBannerTextRepresentsCurrentScanState(t *testing.T) {
 	}
 }
 
+func TestAlertBannerShowsSMARTReadFailureReason(t *testing.T) {
+	disks := []smart.Disk{{Index: 3, Kind: smart.KindNVMe, SMARTReadError: "NVMe Health Log: bridge does not support passthrough"}}
+	got := alertBannerText(disks, nil)
+	if !strings.Contains(got, "Disk3") || !strings.Contains(got, "bridge does not support passthrough") {
+		t.Fatalf("unread SMART banner lacks diagnostic: %q", got)
+	}
+}
+
 func TestReportBannerShowsStartupStatusWithoutDialog(t *testing.T) {
 	text, color := reportBanner(nil, nil, "扫描失败：访问被拒绝")
 	if !strings.Contains(text, "扫描失败：访问被拒绝") || !strings.Contains(text, "未发现支持 SMART") {

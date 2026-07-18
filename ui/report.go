@@ -513,6 +513,24 @@ func unreadSMARTCount(disks []smart.Disk) int {
 	return count
 }
 
+// unreadSMARTDetails gives the main-window banner concise, actionable reasons
+// for unavailable SMART data. Keeping this in the banner lets users verify a
+// USB/RAID compatibility result without horizontally scrolling the table.
+func unreadSMARTDetails(disks []smart.Disk) []string {
+	var details []string
+	for _, d := range disks {
+		if !isSMARTApplicable(d) || len(d.Attrs) != 0 || d.SMARTReadError == "" {
+			continue
+		}
+		reason := []rune(d.SMARTReadError)
+		if len(reason) > 120 {
+			reason = append(reason[:119], '…')
+		}
+		details = append(details, fmt.Sprintf("  Disk%d: %s", d.Index, string(reason)))
+	}
+	return details
+}
+
 func smartApplicableCount(disks []smart.Disk) int {
 	count := 0
 	for _, d := range disks {
@@ -530,7 +548,8 @@ func isSMARTApplicable(d smart.Disk) bool {
 func alertBannerText(disks []smart.Disk, vs []health.Violation) string {
 	if len(vs) == 0 {
 		if unread := unreadSMARTCount(disks); unread > 0 {
-			return fmt.Sprintf("⚠️ %d 块磁盘未读取到 SMART 数据，无法得出完整健康结论", unread)
+			lines := []string{fmt.Sprintf("⚠️ %d 块磁盘未读取到 SMART 数据，无法得出完整健康结论", unread)}
+			return strings.Join(append(lines, unreadSMARTDetails(disks)...), "\n")
 		}
 		if smartApplicableCount(disks) == 0 {
 			return "ℹ️ 未发现支持 SMART 的物理磁盘"
@@ -548,6 +567,7 @@ func alertBannerText(disks []smart.Disk, vs []health.Violation) string {
 	}
 	if unread := unreadSMARTCount(disks); unread > 0 {
 		lines = append(lines, fmt.Sprintf("  ⚠️ %d 块磁盘未读取到 SMART 数据", unread))
+		lines = append(lines, unreadSMARTDetails(disks)...)
 	}
 	return strings.Join(lines, "\n")
 }
