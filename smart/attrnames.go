@@ -17,6 +17,12 @@ func ATAAttrNameForModel(model string, id int) string {
 	name := ATAAttrName(id)
 	m := strings.ToLower(model)
 	switch {
+	case isYMTCSATA(model):
+		// CrystalDiskInfo AtaSmart.cpp: ZHITAI (YMTC) models use F3 for
+		// the current temperature, unlike other vendors that reuse this ID.
+		if id == 0xF3 {
+			return "Temperature_Celsius"
+		}
 	case strings.Contains(m, "kioxia"):
 		switch id {
 		case 0xA7:
@@ -97,6 +103,25 @@ func ATAAttrNameForModel(model string, id int) string {
 		}
 	}
 	return name
+}
+
+// ATATemperatureAttributeForModel identifies attributes whose low raw byte is
+// the current Celsius temperature. F3 is deliberately model-scoped: according
+// to CrystalDiskInfo, it is a temperature only on ZHITAI/YMTC SATA SSDs.
+func ATATemperatureAttributeForModel(model string, id int) bool {
+	switch id {
+	case 0xB9, 0xBE, 0xC2:
+		return true
+	case 0xF3:
+		return isYMTCSATA(model)
+	default:
+		return false
+	}
+}
+
+func isYMTCSATA(model string) bool {
+	m := strings.ToLower(model)
+	return strings.Contains(m, "zhitai") || strings.Contains(model, "致态")
 }
 
 func uitoa(v int) string {

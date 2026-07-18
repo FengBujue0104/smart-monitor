@@ -110,4 +110,27 @@ func TestATAAttrNameForModelCrystalDiskInfoAliases(t *testing.T) {
 	if got := ATAAttrNameForModel("WD Blue SA510 2.5 500GB SSD", 0xF2); got != "Host_Reads_GB" {
 		t.Fatalf("WD Blue F2 alias = %q", got)
 	}
+	if got := ATAAttrNameForModel("ZHITAI TiPlus5000", 0xF3); got != "Temperature_Celsius" {
+		t.Fatalf("ZHITAI F3 alias = %q", got)
+	}
+	if got := ATAAttrNameForModel("Intel SSD DC S3500", 0xF3); got == "Temperature_Celsius" {
+		t.Fatalf("Intel F3 must not be interpreted as temperature")
+	}
+}
+
+func TestATATemperatureAttributeForModelLimitsF3ToYMTC(t *testing.T) {
+	for _, test := range []struct {
+		model string
+		id    int
+		want  bool
+	}{
+		{"ZHITAI TiPlus5000", 0xF3, true},
+		{"致态 TiPlus5000", 0xF3, true},
+		{"Intel SSD DC S3500", 0xF3, false},
+		{"Any SATA SSD", 0xC2, true},
+	} {
+		if got := ATATemperatureAttributeForModel(test.model, test.id); got != test.want {
+			t.Fatalf("temperature attribute (%q, 0x%02X) = %v, want %v", test.model, test.id, got, test.want)
+		}
+	}
 }

@@ -37,6 +37,19 @@ func TestATAAlternateTemperatureAttributesUseTemperatureThresholds(t *testing.T)
 	}
 }
 
+func TestATAYMTCF3UsesTemperatureThresholdsOnlyForYMTC(t *testing.T) {
+	ymtc := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "ZHITAI TiPlus5000", Attrs: []smart.Attr{{ID: 0xF3, Raw: 61}}}
+	got := Evaluate([]smart.Disk{ymtc})
+	if len(got) != 1 || got[0].Severity != Critical || got[0].Current != "61°C" {
+		t.Fatalf("YMTC F3 should create a critical temperature violation: %+v", got)
+	}
+
+	intel := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "Intel SSD DC S3500", Attrs: []smart.Attr{{ID: 0xF3, Raw: 61}}}
+	if got := Evaluate([]smart.Disk{intel}); len(got) != 0 {
+		t.Fatalf("non-YMTC F3 must not be treated as temperature: %+v", got)
+	}
+}
+
 func TestATACommandTimeoutWarnsOnlyAfterTenEvents(t *testing.T) {
 	for _, test := range []struct {
 		raw  uint64

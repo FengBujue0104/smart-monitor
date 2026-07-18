@@ -145,7 +145,10 @@ func evaluateATA(d smart.Disk) []Violation {
 			}
 		case 0x0E: // 厂牌特定
 			// 没有型号/厂商语义时不报警，避免把未知厂商字段误判为故障。
-		case 0xC2, 0xB9, 0xBE: // Temperature / vendor temperature variants
+		case 0xC2, 0xB9, 0xBE, 0xF3: // Temperature / vendor temperature variants
+			if !smart.ATATemperatureAttributeForModel(d.Model, a.ID) {
+				break
+			}
 			// raw 值 48 位中，最低字节是当前温度（°C），高位字节可能是历史最高/最低。
 			// 来源：ATA8-ACS 温度属性布局 raw[0]=当前, raw[1]=最低, raw[2]=最高（厂牌差异）。
 			tempCur := int(a.Raw & 0xFF)
@@ -177,7 +180,7 @@ func evaluateATA(d smart.Disk) []Violation {
 				add(a, Warning, its(a.Value), "≥ "+its(a.Thresh))
 			}
 		}
-		if shouldApplyGenericATAThreshold(a) && a.Thresh > 0 && a.Value > 0 && a.Value <= a.Thresh {
+		if shouldApplyGenericATAThreshold(d, a) && a.Thresh > 0 && a.Value > 0 && a.Value <= a.Thresh {
 			severity := Warning
 			if a.Flags&0x0001 != 0 { // ATA SMART 属性标志 bit 0：pre-fail
 				severity = Critical
@@ -191,9 +194,12 @@ func evaluateATA(d smart.Disk) []Violation {
 // shouldApplyGenericATAThreshold keeps per-attribute rules authoritative
 // while still reporting vendor-specific attributes that have reached their
 // device-provided normalized-value threshold.
-func shouldApplyGenericATAThreshold(a smart.Attr) bool {
+func shouldApplyGenericATAThreshold(d smart.Disk, a smart.Attr) bool {
+	if smart.ATATemperatureAttributeForModel(d.Model, a.ID) {
+		return false
+	}
 	switch a.ID {
-	case 0x01, 0x05, 0xB9, 0xBB, 0xBC, 0xBE, 0xC2, 0xC5, 0xC6, 0xE8, 0xE9, 0xAD, 0xB1:
+	case 0x01, 0x05, 0xBB, 0xBC, 0xC5, 0xC6, 0xE8, 0xE9, 0xAD, 0xB1:
 		return false
 	}
 	return true

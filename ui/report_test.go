@@ -49,6 +49,12 @@ func TestAttrDisplaySeparatesRawAndNormalizedValues(t *testing.T) {
 	if got := attrRawStrForModel("WD Blue SA510 2.5 500GB SSD", smart.Attr{ID: 0xF2, Raw: 13631, Kind: "ata"}); got != "13631 GB" {
 		t.Fatalf("unexpected WD Blue host reads display: %q", got)
 	}
+	if got := attrRawStrForModel("ZHITAI TiPlus5000", smart.Attr{ID: 0xF3, Raw: 0x46302A, Kind: "ata"}); got != "42°C (min 48°C, max 70°C)" {
+		t.Fatalf("unexpected YMTC F3 temperature display: %q", got)
+	}
+	if got := attrRawStrForModel("Intel SSD DC S3500", smart.Attr{ID: 0xF3, Raw: 42, Kind: "ata"}); got != "42" {
+		t.Fatalf("unexpected non-YMTC F3 display: %q", got)
+	}
 }
 
 func TestDiskSummaryIncludesCapacityAndReadState(t *testing.T) {

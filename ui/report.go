@@ -339,6 +339,15 @@ func attrRawStr(a smart.Attr) string {
 // CrystalDiskInfo reports. Unknown models retain the generic raw display.
 func attrRawStrForModel(model string, a smart.Attr) string {
 	if a.Kind == "ata" {
+		if smart.ATATemperatureAttributeForModel(model, a.ID) {
+			current := a.Raw & 0xFF
+			minimum := (a.Raw >> 8) & 0xFF
+			maximum := (a.Raw >> 16) & 0xFF
+			if minimum != 0 || maximum != 0 {
+				return fmt.Sprintf("%d°C (min %d°C, max %d°C)", current, minimum, maximum)
+			}
+			return fmt.Sprintf("%d°C (raw %d)", current, a.Raw)
+		}
 		m := strings.ToLower(model)
 		switch {
 		case strings.Contains(m, "kioxia") && a.ID == 0xF1:
