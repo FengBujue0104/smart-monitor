@@ -191,3 +191,28 @@ func TestATAHealthPercentForVerifiedCrystalDiskInfoModels(t *testing.T) {
 		t.Fatal("Samsung HDD B1 must not use the SSD health rule")
 	}
 }
+
+func TestATACounterUnitForModelUsesVerifiedMappings(t *testing.T) {
+	for _, test := range []struct {
+		model string
+		id    int
+		unit  ATACounterUnit
+		ok    bool
+	}{
+		{"KIOXIA-EXCERIA SATA SSD", 0xF1, ATACounterUnit32MB, true},
+		{"WD Blue SA510 2.5 500GB SSD", 0xE9, ATACounterUnitGB, true},
+		{"ZHITAI TiPlus5000", 0xF2, ATACounterUnit512B, true},
+		{"Samsung SSD 870 EVO", 0xF1, ATACounterUnit512B, true},
+		{"CT1000MX500SSD1", 0xF2, ATACounterUnit32MB, true},
+		{"INTEL SSDSC2BA200G3", 0xF3, ATACounterUnit32MB, true},
+		{"KINGSTON SKC600512G", 0xF1, ATACounterUnit32MB, true},
+		{"TOSHIBA THNSNC128GCSJ", 0xF2, ATACounterUnit32MB, true},
+		{"Seagate ZA240CV10001", 0xEA, ATACounterUnitGB, true},
+		{"Generic SATA SSD", 0xF1, ATACounterUnitUnknown, false},
+	} {
+		unit, ok := ATACounterUnitForModel(test.model, test.id)
+		if unit != test.unit || ok != test.ok {
+			t.Fatalf("counter unit (%q, 0x%02X) = %v, %v; want %v, %v", test.model, test.id, unit, ok, test.unit, test.ok)
+		}
+	}
+}

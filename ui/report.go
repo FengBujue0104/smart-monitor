@@ -381,43 +381,15 @@ func attrRawStrForModel(model string, a smart.Attr) string {
 			}
 			return fmt.Sprintf("%d°C (raw %d)", current, a.Raw)
 		}
-		if smart.IsYMTCSATAModel(model) && (a.ID == 0xF1 || a.ID == 0xF2) {
-			// CrystalDiskInfo's IsSsdYmtc selects 512-byte host I/O units.
-			// Convert sectors to GiB, retaining the raw unit for traceability.
-			return fmt.Sprintf("%.2f GiB (%d × 512 B)", float64(a.Raw)/(2*1024*1024), a.Raw)
-		}
-		m := strings.ToLower(model)
-		switch {
-		case smart.IsSamsungSATASSDModel(model) && (a.ID == 0xF1 || a.ID == 0xF2):
-			// CrystalDiskInfo uses 512-byte LBA units for Samsung SATA F1/F2.
-			// SM951 is NVMe and is handled by the NVMe path, not this ATA path.
-			return fmt.Sprintf("%.2f GiB (%d × 512 B)", float64(a.Raw)/(2*1024*1024), a.Raw)
-		case smart.IsCrucial32MBHostCounterModel(model) && (a.ID == 0xF1 || a.ID == 0xF2):
-			// CrystalDiskInfo's IsSsdMicronMU03 selects 32 MB units for
-			// matching Crucial MX/BX SATA families.
-			return fmt.Sprintf("%d GB (%d × 32 MB)", a.Raw/32, a.Raw)
-		case smart.IsIntelOrSolidigmSATAModel(model) && (a.ID == 0xF1 || a.ID == 0xF3):
-			// CrystalDiskInfo converts Intel F1 host writes and F3 NAND writes
-			// from 32 MB units to GB. F3 temperature is YMTC-only.
-			return fmt.Sprintf("%d GB (%d × 32 MB)", a.Raw/32, a.Raw)
-		case smart.IsKingstonKC600Model(model) && (a.ID == 0xF1 || a.ID == 0xF2):
-			// CrystalDiskInfo's dedicated KC600 branch uses 32 MB units.
-			return fmt.Sprintf("%d GB (%d × 32 MB)", a.Raw/32, a.Raw)
-		case smart.IsToshiba32MBHostCounterModel(model) && (a.ID == 0xF1 || a.ID == 0xF2):
-			// CrystalDiskInfo's explicit Toshiba family list uses 32 MB units.
-			return fmt.Sprintf("%d GB (%d × 32 MB)", a.Raw/32, a.Raw)
-		case strings.Contains(m, "seagate") && (a.ID == 0xE9 || a.ID == 0xEA || a.ID == 0xF1 || a.ID == 0xF2):
-			// CrystalDiskInfo's Seagate branch uses direct GB counters for
-			// these host/NAND write and host read attributes.
-			return fmt.Sprintf("%d GB", a.Raw)
-		case strings.Contains(m, "kioxia") && a.ID == 0xF1:
-			// CrystalDiskInfo's IsSsdKioxia selects 32 MB host I/O units;
-			// its F1 handling converts the raw counter to GB by dividing by 32.
-			return fmt.Sprintf("%d GB (%d × 32 MB)", a.Raw/32, a.Raw)
-		case strings.Contains(m, "wd blue sa510") && (a.ID == 0xE9 || a.ID == 0xF1 || a.ID == 0xF2):
-			// CrystalDiskInfo's WDC handling and the exported SA510 report
-			// show host reads/writes and E9 NAND writes directly in GB.
-			return fmt.Sprintf("%d GB", a.Raw)
+		if unit, ok := smart.ATACounterUnitForModel(model, a.ID); ok {
+			switch unit {
+			case smart.ATACounterUnit512B:
+				return fmt.Sprintf("%.2f GiB (%d × 512 B)", float64(a.Raw)/(2*1024*1024), a.Raw)
+			case smart.ATACounterUnit32MB:
+				return fmt.Sprintf("%d GB (%d × 32 MB)", a.Raw/32, a.Raw)
+			case smart.ATACounterUnitGB:
+				return fmt.Sprintf("%d GB", a.Raw)
+			}
 		}
 	}
 	return attrRawStr(a)

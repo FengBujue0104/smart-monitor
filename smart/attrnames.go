@@ -221,6 +221,45 @@ func IsToshiba32MBHostCounterModel(model string) bool {
 	return false
 }
 
+// ATACounterUnit is the unit CrystalDiskInfo assigns to a vendor-specific ATA
+// counter after matching the model and attribute ID.
+type ATACounterUnit uint8
+
+const (
+	ATACounterUnitUnknown ATACounterUnit = iota
+	ATACounterUnitGB
+	ATACounterUnit32MB
+	ATACounterUnit512B
+)
+
+// ATACounterUnitForModel centralizes source-verified CrystalDiskInfo counter
+// units. It intentionally returns false for unknown model/attribute pairs.
+func ATACounterUnitForModel(model string, id int) (ATACounterUnit, bool) {
+	m := strings.ToLower(model)
+	switch {
+	case IsYMTCSATAModel(model) && (id == 0xF1 || id == 0xF2):
+		return ATACounterUnit512B, true
+	case IsSamsungSATASSDModel(model) && (id == 0xF1 || id == 0xF2):
+		return ATACounterUnit512B, true
+	case strings.Contains(m, "kioxia") && id == 0xF1:
+		return ATACounterUnit32MB, true
+	case IsCrucial32MBHostCounterModel(model) && (id == 0xF1 || id == 0xF2):
+		return ATACounterUnit32MB, true
+	case IsIntelOrSolidigmSATAModel(model) && (id == 0xF1 || id == 0xF3):
+		return ATACounterUnit32MB, true
+	case IsKingstonKC600Model(model) && (id == 0xF1 || id == 0xF2):
+		return ATACounterUnit32MB, true
+	case IsToshiba32MBHostCounterModel(model) && (id == 0xF1 || id == 0xF2):
+		return ATACounterUnit32MB, true
+	case strings.Contains(m, "wd blue sa510") && (id == 0xE9 || id == 0xF1 || id == 0xF2):
+		return ATACounterUnitGB, true
+	case strings.Contains(m, "seagate") && (id == 0xE9 || id == 0xEA || id == 0xF1 || id == 0xF2):
+		return ATACounterUnitGB, true
+	default:
+		return ATACounterUnitUnknown, false
+	}
+}
+
 // ATAHealthPercentForModel returns a vendor-defined remaining-life percentage
 // only where the interpretation is verified by CrystalDiskInfo and a model
 // match. The ATA standard does not assign a universal SSD-life attribute.
