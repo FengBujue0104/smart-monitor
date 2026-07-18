@@ -92,3 +92,11 @@ ATA SMART 数据页校验和异常会作为数据完整性警告显示，并触�
 3. NVMe 盘能显示 Temperature / PercentageUsed / MediaErrors
 4. 复制报表粘贴到记事本/微信无乱码（UTF-16 BOM）
 5. 对支持两条路径的 ATA 盘，交叉比对 IOCTL 与 WMI 的属性 ID、Raw、当前值、最差值和阈值；两者应一致。
+
+### 无需坏盘的异常模拟
+
+下面的测试构造 ATA 重映射扇区、过热、命令超时、厂商 Pre-fail，以及 NVMe 临界位图、介质错误、传感器过热和寿命告警；同时验证“复制异常条目”的 TSV 内容不包含健康属性：
+
+```powershell
+go test -run TestSimulatedDiskFailuresProduceFeedbackReport -v .
+```
