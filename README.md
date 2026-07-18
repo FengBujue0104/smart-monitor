@@ -35,6 +35,7 @@ Windows 10/11 兼容、单 .exe 分发。读取物理硬盘的 S.M.A.R.T 属性�
 | Samsung SATA SSD | `B1` 为剩余寿命；`F1/F2` 按 512 B LBA 显示；不作用于 Samsung HDD |
 | Crucial MX/BX100/200/300/500 SATA | `F1/F2` 按 32 MB 单位显示 |
 | Intel / Solidigm SATA | `F1` 主机写入、`F3` NAND 写入均按 32 MB 单位显示 |
+| Seagate | `F1/F2` 主机读写与 `E9/EA` NAND 写入直接以 GB 显示 |
 
 `F3` 是典型厂商复用字段：YMTC 将其用作温度，而 Intel/Solidigm 将其用作 NAND 写入；未知型号只显示原始数值。
 
