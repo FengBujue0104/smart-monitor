@@ -188,6 +188,14 @@ func TestApacerE7LifeUsesModelScopedRule(t *testing.T) {
 	}
 }
 
+func TestRecadataE7LifeUsesModelScopedRule(t *testing.T) {
+	d := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "RECADATA RS1 512GB", Attrs: []smart.Attr{{ID: 0xE7, Value: 5}}}
+	got := Evaluate([]smart.Disk{d})
+	if len(got) != 1 || got[0].Severity != Warning || got[0].Current != "5% (remaining)" {
+		t.Fatalf("RECADATA E7 low-life = %+v", got)
+	}
+}
+
 // TestCrystalDiskInfoExportedHealthyDisksRemainHealthy is a regression fixture
 // transcribed from CrystalDiskInfo_20260718090515.txt. CrystalDiskInfo reports
 // KIOXIA-EXCERIA at 96% and WD Blue SA510 at 98%, both in good condition.

@@ -123,6 +123,12 @@ func TestAttrRawStrForModelShowsApacerLBACounter(t *testing.T) {
 	}
 }
 
+func TestAttrRawStrForModelShowsRecadataGBCounter(t *testing.T) {
+	if got := attrRawStrForModel("RECADATA RS1 512GB", smart.Attr{ID: 0xF2, Raw: 456, Kind: "ata"}); got != "456 GB" {
+		t.Fatalf("RECADATA F2 display = %q", got)
+	}
+}
+
 func TestDiskSummaryShowsOverallSMARTStatusWhenKnown(t *testing.T) {
 	d := smart.Disk{Model: "Test HDD", SmartStatusKnown: true, SmartStatusPassed: false, Attrs: []smart.Attr{{ID: 1}}}
 	if got := diskSummary(d); !strings.Contains(got, "SMART失败") || smartStatusText(d) != "失败" {

@@ -389,3 +389,13 @@ func TestApacerProfileUsesSourceDefinedLifeAndUnits(t *testing.T) {
 		t.Fatalf("Apacer F2 unit = %v, %v", got, ok)
 	}
 }
+
+func TestRecadataProfileUsesSourceDefinedLifeAndUnits(t *testing.T) {
+	model := "RECADATA RS1 512GB"
+	if got, ok := ATAHealthPercentForModel(model, []Attr{{ID: 0xE7, Value: 8}}); !ok || got != 8 {
+		t.Fatalf("RECADATA E7 life = %d, %v", got, ok)
+	}
+	if got, ok := ATACounterUnitForModel(model, 0xF1); !ok || got != ATACounterUnitGB {
+		t.Fatalf("RECADATA F1 unit = %v, %v", got, ok)
+	}
+}

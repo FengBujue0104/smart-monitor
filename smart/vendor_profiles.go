@@ -175,6 +175,10 @@ func isApacerSATA(model string) bool {
 	return strings.HasPrefix(m, "APACER") || strings.HasPrefix(m, "ZADAK")
 }
 
+func isRecadataSATA(model string) bool {
+	return strings.HasPrefix(strings.ToUpper(strings.TrimSpace(model)), "RECADATA")
+}
+
 var ataVendorProfiles = []ataVendorProfile{
 	{
 		name:           "YMTC/ZHITAI SATA",
@@ -305,6 +309,13 @@ var ataVendorProfiles = []ataVendorProfile{
 		matches:         isApacerSATA,
 		aliases:         map[int]string{0xE7: "SSD_Life_Left", 0xF1: "Host_Writes", 0xF2: "Host_Reads"},
 		counterUnits:    map[int]ATACounterUnit{0xF1: ATACounterUnit512B, 0xF2: ATACounterUnit512B},
+		remainingHealth: currentE7RemainingHealth,
+	},
+	{
+		name:            "RECADATA SATA",
+		matches:         isRecadataSATA,
+		aliases:         map[int]string{0xE7: "SSD_Life_Left", 0xF1: "Host_Writes_GB", 0xF2: "Host_Reads_GB"},
+		counterUnits:    map[int]ATACounterUnit{0xF1: ATACounterUnitGB, 0xF2: ATACounterUnitGB},
 		remainingHealth: currentE7RemainingHealth,
 	},
 	{
