@@ -375,8 +375,9 @@ func attrRawStrForModel(model string, a smart.Attr) string {
 			// CrystalDiskInfo's IsSsdKioxia selects 32 MB host I/O units;
 			// its F1 handling converts the raw counter to GB by dividing by 32.
 			return fmt.Sprintf("%d GB (%d × 32 MB)", a.Raw/32, a.Raw)
-		case strings.Contains(m, "wd blue") && (a.ID == 0xF1 || a.ID == 0xF2):
-			// WD Blue SA510 exposes these counters directly in GB.
+		case strings.Contains(m, "wd blue sa510") && (a.ID == 0xE9 || a.ID == 0xF1 || a.ID == 0xF2):
+			// CrystalDiskInfo's WDC handling and the exported SA510 report
+			// show host reads/writes and E9 NAND writes directly in GB.
 			return fmt.Sprintf("%d GB", a.Raw)
 		}
 	}
