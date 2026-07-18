@@ -119,6 +119,9 @@ func TestATAAttrNameForModelCrystalDiskInfoAliases(t *testing.T) {
 	if got := ATAAttrNameForModel("Samsung SSD 870 EVO 1TB", 0xF2); got != "Host_Reads" {
 		t.Fatalf("Samsung F2 alias = %q", got)
 	}
+	if got := ATAAttrNameForModel("CT1000MX500SSD1", 0xF1); got != "Host_Writes" {
+		t.Fatalf("Crucial MX500 F1 alias = %q", got)
+	}
 	if got := ATAAttrNameForModel("Intel SSD DC S3500", 0xF3); got == "Temperature_Celsius" {
 		t.Fatalf("Intel F3 must not be interpreted as temperature")
 	}
@@ -141,6 +144,9 @@ func TestATATemperatureAttributeForModelLimitsF3ToYMTC(t *testing.T) {
 	}
 	if !IsYMTCSATAModel("ZHITAI TiPlus5000") || !IsYMTCSATAModel("致态 TiPlus5000") || IsYMTCSATAModel("Intel SSD DC S3500") {
 		t.Fatal("unexpected YMTC model identification")
+	}
+	if !IsCrucial32MBHostCounterModel("CT1000MX500SSD1") || !IsCrucial32MBHostCounterModel("Crucial BX500SSD") || IsCrucial32MBHostCounterModel("Micron M600") {
+		t.Fatal("unexpected Crucial 32 MB model identification")
 	}
 }
 

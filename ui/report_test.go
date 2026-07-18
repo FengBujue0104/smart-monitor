@@ -59,6 +59,9 @@ func TestAttrDisplaySeparatesRawAndNormalizedValues(t *testing.T) {
 	if got := attrRawStrForModel("Samsung SSD 870 EVO 1TB", smart.Attr{ID: 0xF1, Raw: 2097152, Kind: "ata"}); got != "1.00 GiB (2097152 × 512 B)" {
 		t.Fatalf("unexpected Samsung host writes display: %q", got)
 	}
+	if got := attrRawStrForModel("CT1000MX500SSD1", smart.Attr{ID: 0xF2, Raw: 32000, Kind: "ata"}); got != "1000 GB (32000 × 32 MB)" {
+		t.Fatalf("unexpected Crucial host reads display: %q", got)
+	}
 	if got := attrRawStrForModel("ZHITAI TiPlus5000", smart.Attr{ID: 0xF3, Raw: 0x46302A, Kind: "ata"}); got != "42°C (min 48°C, max 70°C)" {
 		t.Fatalf("unexpected YMTC F3 temperature display: %q", got)
 	}

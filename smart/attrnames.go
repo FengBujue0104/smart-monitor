@@ -97,6 +97,13 @@ func ATAAttrNameForModel(model string, id int) string {
 		case 0xF2:
 			return "Host_Reads"
 		}
+	case IsCrucial32MBHostCounterModel(model):
+		switch id {
+		case 0xF1:
+			return "Host_Writes"
+		case 0xF2:
+			return "Host_Reads"
+		}
 	case strings.Contains(m, "western digital") || strings.Contains(m, "wd "):
 		switch id {
 		case 0xC4:
@@ -145,6 +152,18 @@ func IsYMTCSATAModel(model string) bool {
 func IsSamsungSATASSDModel(model string) bool {
 	m := strings.ToLower(strings.TrimSpace(model))
 	return strings.Contains(m, "samsung ssd") || strings.Contains(m, "samsung mz") || strings.HasPrefix(m, "mz-")
+}
+
+// IsCrucial32MBHostCounterModel matches the Crucial SATA families for which
+// CrystalDiskInfo's IsSsdMicronMU03 selects 32 MB host read/write units.
+func IsCrucial32MBHostCounterModel(model string) bool {
+	m := strings.ToUpper(model)
+	for _, family := range []string{"MX500SSD", "BX500SSD", "MX300SSD", "BX300SSD", "MX200SSD", "BX200SSD", "MX100SSD", "BX100SSD"} {
+		if strings.Contains(m, family) {
+			return true
+		}
+	}
+	return false
 }
 
 // ATAHealthPercentForModel returns a vendor-defined remaining-life percentage
