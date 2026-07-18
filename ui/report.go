@@ -19,6 +19,8 @@ type ReportWin struct {
 	violations []health.Violation
 	tv         *walk.TableView
 	banner     *walk.Label
+	rescanBtn  *walk.PushButton
+	rescanning bool
 }
 
 // RunReport 显示报表。异常统一显示在主窗口横幅和表格中，不创建第二个告警窗口。
@@ -87,6 +89,7 @@ func RunReportWithStatus(disks []smart.Disk, violations []health.Violation, stat
 						OnClicked: func() { rw.simulateFailures() },
 					},
 					PushButton{
+						AssignTo:  &rw.rescanBtn,
 						Text:      "重新扫描",
 						MinSize:   Size{Width: 100, Height: 30},
 						OnClicked: func() { rw.rescan() },
@@ -567,14 +570,34 @@ func (rw *ReportWin) copyReport() {
 }
 
 func (rw *ReportWin) rescan() {
-	disks, err := smart.Discover()
-	if err != nil {
-		rw.showStatus("扫描失败："+err.Error(), walk.RGB(0xB0, 0x20, 0x20))
+	if rw.rescanning {
 		return
 	}
-	if err := rw.setReportData(disks); err != nil {
-		rw.showStatus("刷新失败："+err.Error(), walk.RGB(0xB0, 0x20, 0x20))
+	rw.rescanning = true
+	if rw.rescanBtn != nil {
+		rw.rescanBtn.SetEnabled(false)
 	}
+	rw.showStatus("正在重新扫描磁盘，请稍候…", walk.RGB(0xB0, 0x60, 0x00))
+
+	// SMART IOCTL and WMI probing can take noticeable time on USB/RAID
+	// controllers. Keep that work outside Walk's UI thread, then marshal only
+	// the model replacement back to the window.
+	go func() {
+		disks, err := smart.Discover()
+		rw.Synchronize(func() {
+			rw.rescanning = false
+			if rw.rescanBtn != nil {
+				rw.rescanBtn.SetEnabled(true)
+			}
+			if err != nil {
+				rw.showStatus("扫描失败："+err.Error(), walk.RGB(0xB0, 0x20, 0x20))
+				return
+			}
+			if err := rw.setReportData(disks); err != nil {
+				rw.showStatus("刷新失败："+err.Error(), walk.RGB(0xB0, 0x20, 0x20))
+			}
+		})
+	}()
 }
 
 func (rw *ReportWin) simulateFailures() {
