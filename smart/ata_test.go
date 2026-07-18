@@ -1,6 +1,46 @@
 package smart
 
-import "testing"
+import (
+	"runtime"
+	"testing"
+	"unsafe"
+)
+
+func TestBuildSATSMARTReadCDBUsesReadOnlyATAPassThrough(t *testing.T) {
+	got := buildSATSMARTReadCDB(SMART_READ_DATA)
+	want := [16]byte{0x85, 0x08, 0x0E, 0, SMART_READ_DATA, 0, 1, 0, 0, 0, 0x4F, 0, 0xC2, 0xA0, ATA_CMD_SMART, 0}
+	if got != want {
+		t.Fatalf("SAT SMART CDB = % X, want % X", got, want)
+	}
+	if got[14] != ATA_CMD_SMART || got[4] != SMART_READ_DATA {
+		t.Fatalf("SAT CDB must issue only ATA SMART READ DATA: % X", got)
+	}
+}
+
+func TestSCSIPassThroughDirectLayoutMatchesWindowsSDK(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		t.Skip("packaged target is amd64")
+	}
+	var req scsiPassThroughDirect
+	if got, want := unsafe.Sizeof(req), uintptr(56); got != want {
+		t.Fatalf("SCSI_PASS_THROUGH_DIRECT size = %d, want %d", got, want)
+	}
+	for _, field := range []struct {
+		name string
+		got  uintptr
+		want uintptr
+	}{
+		{"DataTransferLength", unsafe.Offsetof(req.DataTransferLength), 12},
+		{"TimeOutValue", unsafe.Offsetof(req.TimeOutValue), 16},
+		{"DataBuffer", unsafe.Offsetof(req.DataBuffer), 24},
+		{"SenseInfoOffset", unsafe.Offsetof(req.SenseInfoOffset), 32},
+		{"Cdb", unsafe.Offsetof(req.Cdb), 36},
+	} {
+		if field.got != field.want {
+			t.Fatalf("SCSI_PASS_THROUGH_DIRECT.%s offset = %d, want %d", field.name, field.got, field.want)
+		}
+	}
+}
 
 func TestBuildSmartCmdUsesATASMARTTaskFileSignature(t *testing.T) {
 	cmd := buildSmartCmd(ATA_CMD_SMART, SMART_READ_DATA, 3, make([]byte, 512))

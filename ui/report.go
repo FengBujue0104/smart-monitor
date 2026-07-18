@@ -410,6 +410,9 @@ func diskSummary(d smart.Disk) string {
 	if life, ok := smart.ATAHealthPercentForModel(d.Model, d.Attrs); ok {
 		summary = fmt.Sprintf("%s (健康度 %d%%)", summary, life)
 	}
+	if d.SMARTTransport != "" {
+		summary += " [" + d.SMARTTransport + "]"
+	}
 	if len(d.Attrs) == 0 {
 		if d.Kind == smart.KindUnknown {
 			return summary + " [SMART不适用]"

@@ -197,6 +197,13 @@ func Discover() ([]Disk, error) {
 				}
 			}
 			attrs, _, checksumValid, smErr := ReadSMARTDataDetailed(h, byte(i))
+			usedSAT := false
+			if smErr != nil {
+				// USB/SCSI bridges commonly reject SMART_RCV_DRIVE_DATA but expose
+				// the same read-only ATA SMART pages through standard SAT.
+				attrs, _, checksumValid, smErr = ReadSMARTDataSATDetailed(h)
+				usedSAT = smErr == nil
+			}
 			status, statusErr := ReadSMARTOverallStatus(h)
 			if statusErr == nil {
 				d.SmartStatusKnown = true
@@ -207,9 +214,17 @@ func Discover() ([]Disk, error) {
 			if smErr != nil {
 				log.Printf("[disk%d] SMART_DATA_ERR: %v", i, smErr)
 			} else {
+				if usedSAT {
+					d.SMARTTransport = "SAT (SCSI/USB bridge)"
+				} else {
+					d.SMARTTransport = "ATA IOCTL"
+				}
 				d.SMARTChecksumKnown = true
 				d.SMARTChecksumValid = checksumValid
 				th, thresholdChecksumValid, thErr := ReadSMARTThresholdsDetailed(h, byte(i))
+				if thErr != nil {
+					th, thresholdChecksumValid, thErr = ReadSMARTThresholdsSATDetailed(h)
+				}
 				if thErr == nil {
 					d.SMARTThresholdChecksumKnown = true
 					d.SMARTThresholdChecksumValid = thresholdChecksumValid

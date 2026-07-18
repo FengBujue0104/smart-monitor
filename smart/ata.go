@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"runtime"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
@@ -20,6 +21,37 @@ const (
 	SMART_READ_THRESHOLDS = 0xD1
 	SMART_RETURN_STATUS   = 0xDA
 )
+
+const (
+	scsiIOCTLDataIn            = 1
+	satPassThrough16           = 0x85
+	satProtocolPIODataIn       = 4
+	satFlagTransferSectorCount = 0x0E // T_DIR | BYT_BLOK | T_LENGTH=sector count
+)
+
+// scsiPassThroughDirect matches SCSI_PASS_THROUGH_DIRECT on supported Windows
+// architectures. The project is packaged for amd64, and unsafe.Sizeof keeps
+// Length correct if it is built for another Windows architecture.
+type scsiPassThroughDirect struct {
+	Length             uint16
+	ScsiStatus         byte
+	PathID             byte
+	TargetID           byte
+	Lun                byte
+	CdbLength          byte
+	SenseInfoLength    byte
+	DataIn             byte
+	DataTransferLength uint32
+	TimeOutValue       uint32
+	DataBuffer         *byte
+	SenseInfoOffset    uint32
+	Cdb                [16]byte
+}
+
+type scsiPassThroughDirectWithSense struct {
+	request scsiPassThroughDirect
+	sense   [32]byte
+}
 
 // ===== SMART_RCV_DRIVE_DATA / SEND_DRIVE_DATA（ntdddisk.h）=====
 // 这是 Windows 原生 SMART 接口，兼容性最好。
@@ -235,6 +267,72 @@ func ReadSMARTDataDetailed(h windows.Handle, driveNum byte) ([]Attr, bool, bool,
 	return parseSMARTData(data), true, smartChecksumValid(data), nil
 }
 
+// buildSATSMARTReadCDB creates an ATA PASS-THROUGH(16) SMART data command.
+// SAT (SCSI / ATA Translation) is used by a large class of USB-to-SATA bridges.
+func buildSATSMARTReadCDB(subcommand byte) [16]byte {
+	var cdb [16]byte
+	cdb[0] = satPassThrough16
+	cdb[1] = satProtocolPIODataIn << 1
+	cdb[2] = satFlagTransferSectorCount
+	cdb[4] = subcommand // ATA Features: SMART subcommand
+	cdb[6] = 1          // ATA Sector Count: one 512-byte SMART page
+	cdb[10] = 0x4F      // ATA LBA Mid SMART signature
+	cdb[12] = 0xC2      // ATA LBA High SMART signature
+	cdb[13] = 0xA0      // ATA Device
+	cdb[14] = ATA_CMD_SMART
+	return cdb
+}
+
+func issueSATSMARTRead(h windows.Handle, subcommand byte) ([]byte, error) {
+	data := make([]byte, 512)
+	packet := scsiPassThroughDirectWithSense{}
+	req := &packet.request
+	req.Length = uint16(unsafe.Sizeof(*req))
+	req.CdbLength = uint8(len(req.Cdb))
+	req.SenseInfoLength = uint8(len(packet.sense))
+	req.DataIn = scsiIOCTLDataIn
+	req.DataTransferLength = uint32(len(data))
+	req.TimeOutValue = 10
+	req.DataBuffer = &data[0]
+	req.SenseInfoOffset = uint32(unsafe.Offsetof(packet.sense))
+	req.Cdb = buildSATSMARTReadCDB(subcommand)
+
+	var returned uint32
+	err := windows.DeviceIoControl(
+		h,
+		IOCTL_SCSI_PASS_THROUGH_DIRECT,
+		(*byte)(unsafe.Pointer(&packet)),
+		uint32(unsafe.Sizeof(packet)),
+		(*byte)(unsafe.Pointer(&packet)),
+		uint32(unsafe.Sizeof(packet)),
+		&returned,
+		nil,
+	)
+	runtime.KeepAlive(data)
+	if err != nil {
+		return nil, fmt.Errorf("SAT ATA PASS-THROUGH(16) SMART 0x%02X: %w", subcommand, err)
+	}
+	if req.ScsiStatus != 0 {
+		senseLen := int(req.SenseInfoLength)
+		if senseLen > len(packet.sense) {
+			senseLen = len(packet.sense)
+		}
+		return nil, fmt.Errorf("SAT ATA PASS-THROUGH(16) SMART 0x%02X SCSI status=0x%02X sense=% X", subcommand, req.ScsiStatus, packet.sense[:senseLen])
+	}
+	return data, nil
+}
+
+// ReadSMARTDataSATDetailed reads the standard ATA SMART data page through a
+// SAT-capable SCSI or USB bridge. It is a read-only fallback for controllers
+// that reject the legacy SMART_RCV_DRIVE_DATA IOCTL.
+func ReadSMARTDataSATDetailed(h windows.Handle) ([]Attr, bool, bool, error) {
+	data, err := issueSATSMARTRead(h, SMART_READ_DATA)
+	if err != nil {
+		return nil, false, false, err
+	}
+	return parseSMARTData(data), true, smartChecksumValid(data), nil
+}
+
 func smartChecksumValid(data []byte) bool {
 	if len(data) < 512 {
 		return false
@@ -327,6 +425,16 @@ func ReadSMARTThresholds(h windows.Handle, driveNum byte) (map[int]int, error) {
 // its 512-byte SMART checksum is valid.
 func ReadSMARTThresholdsDetailed(h windows.Handle, driveNum byte) (map[int]int, bool, error) {
 	data, err := issueSmartCommand(h, ATA_CMD_SMART, SMART_READ_THRESHOLDS, driveNum)
+	if err != nil {
+		return nil, false, err
+	}
+	return parseSMARTThresholds(data), smartChecksumValid(data), nil
+}
+
+// ReadSMARTThresholdsSATDetailed reads the ATA SMART threshold page through
+// a SAT-capable SCSI or USB bridge.
+func ReadSMARTThresholdsSATDetailed(h windows.Handle) (map[int]int, bool, error) {
+	data, err := issueSATSMARTRead(h, SMART_READ_THRESHOLDS)
 	if err != nil {
 		return nil, false, err
 	}

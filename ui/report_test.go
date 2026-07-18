@@ -102,6 +102,13 @@ func TestDiskSummaryIncludesCapacityAndReadState(t *testing.T) {
 	}
 }
 
+func TestDiskSummaryShowsSuccessfulSMARTTransport(t *testing.T) {
+	d := smart.Disk{Model: "USB SSD", SMARTTransport: "SAT (SCSI/USB bridge)", Attrs: []smart.Attr{{ID: 1}}}
+	if got := diskSummary(d); !strings.Contains(got, "SAT (SCSI/USB bridge)") {
+		t.Fatalf("disk summary does not show SMART transport: %q", got)
+	}
+}
+
 func TestDiskSummaryShowsOverallSMARTStatusWhenKnown(t *testing.T) {
 	d := smart.Disk{Model: "Test HDD", SmartStatusKnown: true, SmartStatusPassed: false, Attrs: []smart.Attr{{ID: 1}}}
 	if got := diskSummary(d); !strings.Contains(got, "SMART失败") || smartStatusText(d) != "失败" {

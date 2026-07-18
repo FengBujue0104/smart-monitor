@@ -102,6 +102,7 @@ func DiscoverWMI() ([]Disk, error) {
 			d.SmartStatusPassed = !predictFailure
 		}
 		if d.Kind == KindATA && len(data) >= 14 {
+			d.SMARTTransport = "WMI fallback"
 			th, ok := findDataForDriveOK(threshMap, drv)
 			if !ok {
 				th = nil

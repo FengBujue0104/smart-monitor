@@ -22,6 +22,10 @@ const (
 
 	// SCSI Miniport
 	IOCTL_SCSI_MINIPORT = 0x4D008
+	// SCSI pass-through direct. SAT-capable USB/SCSI bridges accept ATA
+	// PASS-THROUGH(16) through this IOCTL, which is the standard fallback when
+	// SMART_RCV_DRIVE_DATA is unavailable outside a native ATA controller.
+	IOCTL_SCSI_PASS_THROUGH_DIRECT = 0x4D014
 
 	// 存储属性查询（DeviceIOControl 官方值）
 	IOCTL_STORAGE_QUERY_PROPERTY = 0x002D1400
