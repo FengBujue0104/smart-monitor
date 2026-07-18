@@ -58,6 +58,37 @@ func samsungRemainingHealth(attrs []Attr) (int, bool) {
 	return a.Value, a.Value >= 0 && a.Value <= 100
 }
 
+func rawE9RemainingHealth(attrs []Attr) (int, bool) {
+	a, ok := attrByID(attrs, 0xE9)
+	if !ok {
+		return 0, false
+	}
+	life := int(a.Raw & 0xFF)
+	return life, life >= 0 && life <= 100
+}
+
+func incrementingRawE9RemainingHealth(attrs []Attr) (int, bool) {
+	a, ok := attrByID(attrs, 0xE9)
+	if !ok {
+		return 0, false
+	}
+	life := 100 - int(a.Raw&0xFF)
+	return life, life >= 0 && life <= 100
+}
+
+func currentE9RemainingHealth(attrs []Attr) (int, bool) {
+	a, ok := attrByID(attrs, 0xE9)
+	if !ok {
+		return 0, false
+	}
+	return a.Value, a.Value >= 0 && a.Value <= 100
+}
+
+func isSKHynixSATA(model string) bool {
+	m := strings.ToUpper(model)
+	return strings.Contains(m, "SK HYNIX") || strings.HasPrefix(m, "HFS") || strings.HasPrefix(m, "SHG")
+}
+
 var ataVendorProfiles = []ataVendorProfile{
 	{
 		name:           "YMTC/ZHITAI SATA",
@@ -133,6 +164,43 @@ var ataVendorProfiles = []ataVendorProfile{
 		matches:      IsToshiba32MBHostCounterModel,
 		aliases:      map[int]string{0xF1: "Host_Writes", 0xF2: "Host_Reads"},
 		counterUnits: map[int]ATACounterUnit{0xF1: ATACounterUnit32MB, 0xF2: ATACounterUnit32MB},
+	},
+	{
+		name: "SK hynix SC311/SC401",
+		matches: func(model string) bool {
+			m := strings.ToUpper(model)
+			return strings.Contains(m, "SC311") || strings.Contains(m, "SC401")
+		},
+		aliases:         map[int]string{0xE9: "SSD_Life_Left", 0xF1: "Host_Writes", 0xF2: "Host_Reads"},
+		counterUnits:    map[int]ATACounterUnit{0xF1: ATACounterUnit512B, 0xF2: ATACounterUnit512B},
+		remainingHealth: rawE9RemainingHealth,
+	},
+	{
+		name: "SK hynix HFS TND/MND",
+		matches: func(model string) bool {
+			m := strings.ToUpper(model)
+			return strings.Contains(m, "HFS") && (strings.Contains(m, "TND") || strings.Contains(m, "MND"))
+		},
+		aliases:         map[int]string{0xE9: "SSD_Life_Left", 0xF1: "Host_Writes_GB", 0xF2: "Host_Reads_GB"},
+		counterUnits:    map[int]ATACounterUnit{0xF1: ATACounterUnitGB, 0xF2: ATACounterUnitGB},
+		remainingHealth: incrementingRawE9RemainingHealth,
+	},
+	{
+		name: "SK hynix HFS TNF",
+		matches: func(model string) bool {
+			m := strings.ToUpper(model)
+			return strings.Contains(m, "HFS") && strings.Contains(m, "TNF")
+		},
+		aliases:         map[int]string{0xE9: "SSD_Life_Left", 0xF1: "Host_Writes_GB", 0xF2: "Host_Reads_GB"},
+		counterUnits:    map[int]ATACounterUnit{0xF1: ATACounterUnitGB, 0xF2: ATACounterUnitGB},
+		remainingHealth: rawE9RemainingHealth,
+	},
+	{
+		name:            "SK hynix SATA",
+		matches:         isSKHynixSATA,
+		aliases:         map[int]string{0xE9: "SSD_Life_Left", 0xF1: "Host_Writes_GB", 0xF2: "Host_Reads_GB"},
+		counterUnits:    map[int]ATACounterUnit{0xF1: ATACounterUnitGB, 0xF2: ATACounterUnitGB},
+		remainingHealth: currentE9RemainingHealth,
 	},
 	{
 		name: "Western Digital SATA",

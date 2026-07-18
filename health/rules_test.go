@@ -117,6 +117,14 @@ func TestSamsungSATASSDB1UsesRemainingLifeRule(t *testing.T) {
 	}
 }
 
+func TestSKHynixRawLifeProfilesUseCrystalDiskInfoThreshold(t *testing.T) {
+	d := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "HFS128G32TND-3110A", Attrs: []smart.Attr{{ID: 0xE9, Raw: 95, Value: 100}}}
+	got := Evaluate([]smart.Disk{d})
+	if len(got) != 1 || got[0].Severity != Warning || got[0].Current != "5% (remaining)" {
+		t.Fatalf("unexpected SK hynix low-life warning: %+v", got)
+	}
+}
+
 // TestCrystalDiskInfoExportedHealthyDisksRemainHealthy is a regression fixture
 // transcribed from CrystalDiskInfo_20260718090515.txt. CrystalDiskInfo reports
 // KIOXIA-EXCERIA at 96% and WD Blue SA510 at 98%, both in good condition.

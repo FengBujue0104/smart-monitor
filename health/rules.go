@@ -164,6 +164,16 @@ func evaluateATA(d smart.Disk) []Violation {
 				add(a, Warning, u64s(a.Raw), "≤ 10")
 			}
 		case 0xE9: // Media_Wearout_Indicator (100=新, 0=耗尽)
+			if life, ok := smart.ATAHealthPercentForModel(d.Model, []smart.Attr{a}); ok {
+				// CrystalDiskInfo uses its configured 10% caution threshold for
+				// vendor life fields, with 0% indicating end of life.
+				if life == 0 {
+					add(a, Critical, "0% (remaining)", "> 0%")
+				} else if life <= 10 {
+					add(a, Warning, its(life)+"% (remaining)", "> 10%")
+				}
+				break
+			}
 			// 该属性的 raw 可能是写入量/厂商复合值，寿命使用归一化 Value。
 			if a.Value > 0 && a.Value <= 10 {
 				add(a, Critical, its(a.Value)+"% (remaining)", "> 10%")

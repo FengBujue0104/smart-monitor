@@ -243,3 +243,24 @@ func TestATAVendorProfilesUseSpecificMatchBeforeGenericMatch(t *testing.T) {
 		}
 	}
 }
+
+func TestSKHynixProfilesUseSourceDefinedUnitsAndLife(t *testing.T) {
+	for _, test := range []struct {
+		model string
+		attr  Attr
+		unit  ATACounterUnit
+		life  int
+	}{
+		{"HFS128G32TND-3110A", Attr{ID: 0xE9, Raw: 95}, ATACounterUnitGB, 5},
+		{"HFS128G32TNF-N3A0A", Attr{ID: 0xE9, Raw: 5}, ATACounterUnitGB, 5},
+		{"SK hynix SC311 SATA 256GB", Attr{ID: 0xE9, Raw: 5}, ATACounterUnit512B, 5},
+		{"SK hynix HFS512GDE9X073N", Attr{ID: 0xE9, Value: 90}, ATACounterUnitGB, 90},
+	} {
+		if got, ok := ATAHealthPercentForModel(test.model, []Attr{test.attr}); !ok || got != test.life {
+			t.Fatalf("SK hynix life for %q = %d, %v; want %d, true", test.model, got, ok, test.life)
+		}
+		if got, ok := ATACounterUnitForModel(test.model, 0xF1); !ok || got != test.unit {
+			t.Fatalf("SK hynix unit for %q = %v, %v; want %v, true", test.model, got, ok, test.unit)
+		}
+	}
+}
