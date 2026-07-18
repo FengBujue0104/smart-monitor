@@ -408,3 +408,13 @@ func TestRecadataProfileUsesSourceDefinedLifeAndUnits(t *testing.T) {
 		t.Fatalf("RECADATA F1 unit = %v, %v", got, ok)
 	}
 }
+
+func TestCorsairVoyagerGTXProfileUsesSourceDefinedLifeAndUnits(t *testing.T) {
+	model := "Corsair Voyager GTX 128GB"
+	if got, ok := ATAHealthPercentForModel(model, []Attr{{ID: 0xE7, Value: 9}}); !ok || got != 9 {
+		t.Fatalf("Corsair E7 life = %d, %v", got, ok)
+	}
+	if got, ok := ATACounterUnitForModel(model, 0xF1); !ok || got != ATACounterUnit1MB {
+		t.Fatalf("Corsair F1 unit = %v, %v", got, ok)
+	}
+}

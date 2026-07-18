@@ -136,6 +136,12 @@ func TestAttrRawStrForModelShowsRecadataGBCounter(t *testing.T) {
 	}
 }
 
+func TestAttrRawStrForModelShowsCorsairVoyagerGTX1MBCounter(t *testing.T) {
+	if got := attrRawStrForModel("Corsair Voyager GTX 128GB", smart.Attr{ID: 0xF1, Raw: 2048, Kind: "ata"}); got != "2 GB (2048 × 1 MB)" {
+		t.Fatalf("Corsair F1 display = %q", got)
+	}
+}
+
 func TestDiskSummaryShowsOverallSMARTStatusWhenKnown(t *testing.T) {
 	d := smart.Disk{Model: "Test HDD", SmartStatusKnown: true, SmartStatusPassed: false, Attrs: []smart.Attr{{ID: 1}}}
 	if got := diskSummary(d); !strings.Contains(got, "SMART失败") || smartStatusText(d) != "失败" {
