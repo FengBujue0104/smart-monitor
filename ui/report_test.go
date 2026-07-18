@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lxn/walk"
 	"smonitor/health"
 	"smonitor/smart"
 )
@@ -138,6 +139,16 @@ func TestAlertBannerTextRepresentsCurrentScanState(t *testing.T) {
 	vs := []health.Violation{{DiskIndex: 0, AttrName: "SMART_Overall_Health", Current: "FAILED", Limit: "PASSED", Severity: health.Critical}}
 	if got := alertBannerText([]smart.Disk{{Kind: smart.KindATA}}, vs); !strings.Contains(got, "SMART_Overall_Health") || !strings.Contains(got, "未读取到 SMART 数据") {
 		t.Fatalf("unexpected violation banner: %q", got)
+	}
+}
+
+func TestReportBannerShowsStartupStatusWithoutDialog(t *testing.T) {
+	text, color := reportBanner(nil, nil, "扫描失败：访问被拒绝")
+	if !strings.Contains(text, "扫描失败：访问被拒绝") || !strings.Contains(text, "未发现支持 SMART") {
+		t.Fatalf("unexpected startup banner: %q", text)
+	}
+	if color != walk.RGB(0xB0, 0x20, 0x20) {
+		t.Fatalf("unexpected startup status color: %#v", color)
 	}
 }
 

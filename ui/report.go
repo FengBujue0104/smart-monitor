@@ -23,8 +23,16 @@ type ReportWin struct {
 
 // RunReport 显示报表。异常统一显示在主窗口横幅和表格中，不创建第二个告警窗口。
 func RunReport(disks []smart.Disk, violations []health.Violation) error {
+	return RunReportWithStatus(disks, violations, "")
+}
+
+// RunReportWithStatus displays an initial operational status in the main
+// window. It is used for startup failures so the application never needs a
+// blocking alert dialog to tell the user what happened.
+func RunReportWithStatus(disks []smart.Disk, violations []health.Violation, status string) error {
 	rw := &ReportWin{disks: disks, violations: violations}
 	model := &reportModel{disks: disks, violations: violations}
+	bannerText, bannerColor := reportBanner(disks, violations, status)
 
 	err := MainWindow{
 		AssignTo: &rw.MainWindow,
@@ -35,9 +43,9 @@ func RunReport(disks []smart.Disk, violations []health.Violation) error {
 		Children: []Widget{
 			Label{
 				AssignTo:  &rw.banner,
-				Text:      alertBannerText(disks, violations),
+				Text:      bannerText,
 				Font:      Font{Family: "微软雅黑", PointSize: 11},
-				TextColor: alertBannerColor(disks, violations),
+				TextColor: bannerColor,
 			},
 			Label{
 				Text:      fmt.Sprintf("检测时间: %s | 主机: %s", time.Now().Format("2006-01-02 15:04:05"), hostName()),
@@ -100,6 +108,14 @@ func RunReport(disks []smart.Disk, violations []health.Violation) error {
 
 	rw.Run()
 	return nil
+}
+
+func reportBanner(disks []smart.Disk, violations []health.Violation, status string) (string, walk.Color) {
+	text, color := alertBannerText(disks, violations), alertBannerColor(disks, violations)
+	if status != "" {
+		return status + "\n" + text, walk.RGB(0xB0, 0x20, 0x20)
+	}
+	return text, color
 }
 
 // ===== 表格模型 =====

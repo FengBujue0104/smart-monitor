@@ -26,10 +26,10 @@ func main() {
 
 	// 检查管理员权限（SMART IOCTL 必需）
 	if !isAdmin() {
-		walk.MsgBox(nil, "需要管理员权限",
-			"本工具需要管理员权限才能读取硬盘 S.M.A.R.T 数据。\n请右键 → 以管理员身份运行。",
-			walk.MsgBoxIconWarning)
-		os.Exit(1)
+		if err := ui.RunReportWithStatus(nil, nil, "⚠ 未以管理员身份运行，无法读取硬盘 S.M.A.R.T 数据。请退出后右键选择“以管理员身份运行”。"); err != nil {
+			log.Printf("UI error: %v", err)
+		}
+		return
 	}
 
 	logFile, err := os.OpenFile("smonitor.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
@@ -44,8 +44,10 @@ func main() {
 	if err != nil || len(disks) == 0 {
 		disks, err = smart.DiscoverWMI()
 		if err != nil {
-			walk.MsgBox(nil, "扫描失败", fmt.Sprintf("枚举磁盘失败: %v", err), walk.MsgBoxIconError)
-			os.Exit(2)
+			if uiErr := ui.RunReportWithStatus(nil, nil, fmt.Sprintf("❌ 扫描失败：枚举磁盘失败: %v", err)); uiErr != nil {
+				log.Printf("UI error: %v", uiErr)
+			}
+			return
 		}
 	} else {
 		// IOCTL 可能无法打开 RAID、USB 桥接或权限受限的某一块物理盘。始终
@@ -55,8 +57,10 @@ func main() {
 		}
 	}
 	if len(disks) == 0 {
-		walk.MsgBox(nil, "未发现磁盘", "未找到任何物理磁盘。", walk.MsgBoxIconInformation)
-		os.Exit(0)
+		if err := ui.RunReportWithStatus(nil, nil, "⚠ 未找到任何物理磁盘。"); err != nil {
+			log.Printf("UI error: %v", err)
+		}
+		return
 	}
 
 	violations := health.Evaluate(disks)
