@@ -359,3 +359,13 @@ func TestIntelDCAndPlextorProfilesUseSourceDefinedFields(t *testing.T) {
 		t.Fatalf("Plextor F2 unit = %v, %v", got, ok)
 	}
 }
+
+func TestSiliconMotionCVCProfileUsesSourceDefinedFields(t *testing.T) {
+	model := "CVC-128G SATA SSD"
+	if got, ok := ATAHealthPercentForModel(model, []Attr{{ID: 0xCA, Value: 6}}); !ok || got != 6 {
+		t.Fatalf("CVC CA life = %d, %v", got, ok)
+	}
+	if got, ok := ATACounterUnitForModel(model, 0xF1); !ok || got != ATACounterUnitGB {
+		t.Fatalf("CVC F1 unit = %v, %v", got, ok)
+	}
+}

@@ -109,6 +109,13 @@ func TestDiskSummaryShowsSuccessfulSMARTTransport(t *testing.T) {
 	}
 }
 
+func TestAttrRawStrForModelShowsSiliconMotionCVCGBCounter(t *testing.T) {
+	got := attrRawStrForModel("CVC-128G SATA SSD", smart.Attr{ID: 0xF1, Raw: 1234, Kind: "ata"})
+	if got != "1234 GB" {
+		t.Fatalf("CVC F1 display = %q", got)
+	}
+}
+
 func TestDiskSummaryShowsOverallSMARTStatusWhenKnown(t *testing.T) {
 	d := smart.Disk{Model: "Test HDD", SmartStatusKnown: true, SmartStatusPassed: false, Attrs: []smart.Attr{{ID: 1}}}
 	if got := diskSummary(d); !strings.Contains(got, "SMART失败") || smartStatusText(d) != "失败" {

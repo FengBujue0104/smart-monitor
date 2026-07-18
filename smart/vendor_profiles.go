@@ -153,6 +153,10 @@ func isPlextorSATA(model string) bool {
 		strings.HasPrefix(m, "CSSD-S6T128NM3PQ") || strings.HasPrefix(m, "CSSD-S6T256NM3PQ")
 }
 
+func isSiliconMotionCVCSATA(model string) bool {
+	return strings.Contains(strings.ToUpper(model), "CVC-")
+}
+
 var ataVendorProfiles = []ataVendorProfile{
 	{
 		name:           "YMTC/ZHITAI SATA",
@@ -257,6 +261,15 @@ var ataVendorProfiles = []ataVendorProfile{
 		aliases:         map[int]string{0xE8: "SSD_Life_Left", 0xF1: "Host_Writes", 0xF2: "Host_Reads"},
 		counterUnits:    map[int]ATACounterUnit{0xF1: ATACounterUnit32MB, 0xF2: ATACounterUnit32MB},
 		remainingHealth: currentE8RemainingHealth,
+	},
+	{
+		// CrystalDiskInfo identifies CVC-* SATA devices as the Silicon Motion
+		// CVC family: CA is remaining life and F1/F2 are direct GB counters.
+		name:            "Silicon Motion CVC SATA",
+		matches:         isSiliconMotionCVCSATA,
+		aliases:         map[int]string{0xCA: "SSD_Life_Left", 0xF1: "Host_Writes_GB", 0xF2: "Host_Reads_GB"},
+		counterUnits:    map[int]ATACounterUnit{0xF1: ATACounterUnitGB, 0xF2: ATACounterUnitGB},
+		remainingHealth: currentCARemainingHealth,
 	},
 	{
 		name:         "Kingston KC600",
