@@ -379,3 +379,13 @@ func TestSsstcProfileUsesSourceDefinedLifeField(t *testing.T) {
 		t.Fatal("SSSTC F1 must remain raw when no common source unit exists")
 	}
 }
+
+func TestApacerProfileUsesSourceDefinedLifeAndUnits(t *testing.T) {
+	model := "Apacer AS340 480GB"
+	if got, ok := ATAHealthPercentForModel(model, []Attr{{ID: 0xE7, Value: 9}}); !ok || got != 9 {
+		t.Fatalf("Apacer E7 life = %d, %v", got, ok)
+	}
+	if got, ok := ATACounterUnitForModel(model, 0xF2); !ok || got != ATACounterUnit512B {
+		t.Fatalf("Apacer F2 unit = %v, %v", got, ok)
+	}
+}

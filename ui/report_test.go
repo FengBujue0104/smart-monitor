@@ -116,6 +116,13 @@ func TestAttrRawStrForModelShowsSiliconMotionCVCGBCounter(t *testing.T) {
 	}
 }
 
+func TestAttrRawStrForModelShowsApacerLBACounter(t *testing.T) {
+	got := attrRawStrForModel("Apacer AS340 480GB", smart.Attr{ID: 0xF1, Raw: 2097152, Kind: "ata"})
+	if got != "1.00 GiB (2097152 × 512 B)" {
+		t.Fatalf("Apacer F1 display = %q", got)
+	}
+}
+
 func TestDiskSummaryShowsOverallSMARTStatusWhenKnown(t *testing.T) {
 	d := smart.Disk{Model: "Test HDD", SmartStatusKnown: true, SmartStatusPassed: false, Attrs: []smart.Attr{{ID: 1}}}
 	if got := diskSummary(d); !strings.Contains(got, "SMART失败") || smartStatusText(d) != "失败" {

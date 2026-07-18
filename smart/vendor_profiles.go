@@ -170,6 +170,11 @@ func isSsstcSATA(model string) bool {
 	return strings.Contains(m, "CV8-") || strings.Contains(m, "CVB-") || strings.Contains(m, "ER2-")
 }
 
+func isApacerSATA(model string) bool {
+	m := strings.ToUpper(strings.TrimSpace(model))
+	return strings.HasPrefix(m, "APACER") || strings.HasPrefix(m, "ZADAK")
+}
+
 var ataVendorProfiles = []ataVendorProfile{
 	{
 		name:           "YMTC/ZHITAI SATA",
@@ -291,6 +296,15 @@ var ataVendorProfiles = []ataVendorProfile{
 		name:            "SSSTC SATA",
 		matches:         isSsstcSATA,
 		aliases:         map[int]string{0xE7: "SSD_Life_Left"},
+		remainingHealth: currentE7RemainingHealth,
+	},
+	{
+		// CrystalDiskInfo's model-matched Apacer/ZADAK SATA branch reports E7
+		// as normalized remaining life and F1/F2 in 512-byte LBA units.
+		name:            "Apacer/ZADAK SATA",
+		matches:         isApacerSATA,
+		aliases:         map[int]string{0xE7: "SSD_Life_Left", 0xF1: "Host_Writes", 0xF2: "Host_Reads"},
+		counterUnits:    map[int]ATACounterUnit{0xF1: ATACounterUnit512B, 0xF2: ATACounterUnit512B},
 		remainingHealth: currentE7RemainingHealth,
 	},
 	{
