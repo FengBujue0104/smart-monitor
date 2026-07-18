@@ -389,6 +389,8 @@ func attrRawStrForModel(model string, a smart.Attr) string {
 			switch unit {
 			case smart.ATACounterUnit512B:
 				return fmt.Sprintf("%.2f GiB (%d × 512 B)", float64(a.Raw)/(2*1024*1024), a.Raw)
+			case smart.ATACounterUnit1MB:
+				return fmt.Sprintf("%d GB (%d × 1 MB)", a.Raw/1024, a.Raw)
 			case smart.ATACounterUnit32MB:
 				return fmt.Sprintf("%d GB (%d × 32 MB)", a.Raw/32, a.Raw)
 			case smart.ATACounterUnitGB:

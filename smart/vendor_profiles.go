@@ -188,6 +188,11 @@ func isRecadataSATA(model string) bool {
 	return strings.HasPrefix(strings.ToUpper(strings.TrimSpace(model)), "RECADATA")
 }
 
+func isCorsairVoyagerGTXSATA(model string) bool {
+	m := strings.ToUpper(model)
+	return strings.HasPrefix(m, "CORSAIR") && strings.Contains(m, "VOYAGER GTX")
+}
+
 var ataVendorProfiles = []ataVendorProfile{
 	{
 		name:           "YMTC/ZHITAI SATA",
@@ -325,6 +330,13 @@ var ataVendorProfiles = []ataVendorProfile{
 		matches:         isRecadataSATA,
 		aliases:         map[int]string{0xE7: "SSD_Life_Left", 0xF1: "Host_Writes_GB", 0xF2: "Host_Reads_GB"},
 		counterUnits:    map[int]ATACounterUnit{0xF1: ATACounterUnitGB, 0xF2: ATACounterUnitGB},
+		remainingHealth: currentE7RemainingHealth,
+	},
+	{
+		name:            "Corsair Voyager GTX SATA",
+		matches:         isCorsairVoyagerGTXSATA,
+		aliases:         map[int]string{0xE7: "SSD_Life_Left", 0xF1: "Host_Writes", 0xF2: "Host_Reads"},
+		counterUnits:    map[int]ATACounterUnit{0xF1: ATACounterUnit1MB, 0xF2: ATACounterUnit1MB},
 		remainingHealth: currentE7RemainingHealth,
 	},
 	{

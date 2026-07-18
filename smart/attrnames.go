@@ -236,6 +236,7 @@ type ATACounterUnit uint8
 const (
 	ATACounterUnitUnknown ATACounterUnit = iota
 	ATACounterUnitGB
+	ATACounterUnit1MB
 	ATACounterUnit32MB
 	ATACounterUnit512B
 )
