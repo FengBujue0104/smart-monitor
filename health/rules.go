@@ -170,6 +170,17 @@ func evaluateATA(d smart.Disk) []Violation {
 			} else if a.Value > 0 && a.Value <= 20 {
 				add(a, Warning, its(a.Value)+"% (remaining)", "> 20%")
 			}
+		case 0xE6: // WD Blue SA510 Media_Wearout_Indicator
+			// CrystalDiskInfo reads remaining life from raw byte 1 for this
+			// model and marks <=10% caution, 0% failure. Other E6 meanings are
+			// vendor-specific, so only use the model-scoped helper.
+			if life, ok := smart.ATAHealthPercentForModel(d.Model, []smart.Attr{a}); ok {
+				if life == 0 {
+					add(a, Critical, "0% (remaining)", "> 0%")
+				} else if life <= 10 {
+					add(a, Warning, its(life)+"% (remaining)", "> 10%")
+				}
+			}
 		case 0xE8: // Available_Reservd_Space (Samsung=life %; WD/Crucial=预留%)
 			if a.Value > 0 && a.Value <= 10 {
 				add(a, Warning, its(a.Value)+"%", "> 10%")

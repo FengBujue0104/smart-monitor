@@ -67,6 +67,33 @@ func TestATACommandTimeoutWarnsOnlyAfterTenEvents(t *testing.T) {
 	}
 }
 
+func TestWDBlueSA510MediaWearoutUsesCrystalDiskInfoLifeRule(t *testing.T) {
+	for _, test := range []struct {
+		raw      uint64
+		want     int
+		severity Severity
+		current  string
+	}{
+		{raw: 0x0200, want: 0}, // 98% remaining, as in the exported report.
+		{raw: 0x5F00, want: 1, severity: Warning, current: "5% (remaining)"},
+		{raw: 0x6400, want: 1, severity: Critical, current: "0% (remaining)"},
+	} {
+		d := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "WD Blue SA510 2.5 500GB SSD", Attrs: []smart.Attr{{ID: 0xE6, Raw: test.raw}}}
+		got := Evaluate([]smart.Disk{d})
+		if len(got) != test.want {
+			t.Fatalf("E6 raw=0x%X: got %d violations, want %d (%+v)", test.raw, len(got), test.want, got)
+		}
+		if test.want > 0 && (got[0].Severity != test.severity || got[0].Current != test.current) {
+			t.Fatalf("E6 raw=0x%X: got %+v", test.raw, got[0])
+		}
+	}
+
+	generic := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "Generic SSD", Attrs: []smart.Attr{{ID: 0xE6, Raw: 0x6400}}}
+	if got := Evaluate([]smart.Disk{generic}); len(got) != 0 {
+		t.Fatalf("generic E6 must not use WD life rule: %+v", got)
+	}
+}
+
 func TestATAOverallSMARTFailureCreatesCriticalViolation(t *testing.T) {
 	d := smart.Disk{Index: 0, Kind: smart.KindATA, SmartStatusKnown: true, SmartStatusPassed: false}
 	got := Evaluate([]smart.Disk{d})
