@@ -276,6 +276,24 @@ func TestNVMeTemperatureSensorOverheatCreatesViolation(t *testing.T) {
 	}
 }
 
+func TestNVMeControllerTemperatureThresholdsOverrideGenericFallback(t *testing.T) {
+	d := smart.Disk{
+		Index: 0, Kind: smart.KindNVMe,
+		NVMeWarningTempThresholdK:  333, // 60°C
+		NVMeCriticalTempThresholdK: 343, // 70°C
+		Attrs:                      []smart.Attr{{ID: smart.NVMeTemperature, Name: "Temperature_Kelvin", Raw: 334}},
+	}
+	got := Evaluate([]smart.Disk{d})
+	if len(got) != 1 || got[0].Severity != Warning || got[0].Current != "61°C" || got[0].Limit != "< 60°C" {
+		t.Fatalf("unexpected controller-threshold warning: %+v", got)
+	}
+	d.Attrs[0].Raw = 343
+	got = Evaluate([]smart.Disk{d})
+	if len(got) != 1 || got[0].Severity != Critical || got[0].Limit != "< 70°C" {
+		t.Fatalf("unexpected controller-threshold critical: %+v", got)
+	}
+}
+
 func TestNVMeCriticalWarningIsFormattedAsHex(t *testing.T) {
 	d := smart.Disk{Index: 0, Kind: smart.KindNVMe, Attrs: []smart.Attr{{
 		ID: smart.NVMeCriticalWarning, Raw: 0x10,

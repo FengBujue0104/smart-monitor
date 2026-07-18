@@ -26,6 +26,32 @@ func TestBuildNVMeGetLogPageUsesProtocolCommandLayout(t *testing.T) {
 	}
 }
 
+func TestBuildNVMeIdentifyControllerUsesAdminCommandLayout(t *testing.T) {
+	buf := buildNVMeAdminCommand(NVMeIdentify, nvmeIdentifyControllerBytes, NVMeIdentifyController)
+	if len(buf) != 144+nvmeIdentifyControllerBytes {
+		t.Fatalf("identify buffer length = %d", len(buf))
+	}
+	if buf[80] != NVMeIdentify || binary.LittleEndian.Uint32(buf[120:124]) != NVMeIdentifyController {
+		t.Fatalf("unexpected identify command: opcode=0x%02X cdw10=0x%08X", buf[80], binary.LittleEndian.Uint32(buf[120:124]))
+	}
+	if binary.LittleEndian.Uint32(buf[0x24:0x28]) != nvmeIdentifyControllerBytes {
+		t.Fatalf("identify data length = %d", binary.LittleEndian.Uint32(buf[0x24:0x28]))
+	}
+}
+
+func TestParseNVMeCompositeTemperatureThresholds(t *testing.T) {
+	identify := make([]byte, nvmeIdentifyControllerBytes)
+	binary.LittleEndian.PutUint16(identify[266:268], 333)
+	binary.LittleEndian.PutUint16(identify[268:270], 343)
+	warningK, criticalK := parseNVMeCompositeTemperatureThresholds(identify)
+	if warningK != 333 || criticalK != 343 {
+		t.Fatalf("thresholds = %dK/%dK, want 333K/343K", warningK, criticalK)
+	}
+	if warningK, criticalK := parseNVMeCompositeTemperatureThresholds(make([]byte, 269)); warningK != 0 || criticalK != 0 {
+		t.Fatalf("short identify data produced thresholds: %dK/%dK", warningK, criticalK)
+	}
+}
+
 func TestParseNVMeHealthLog(t *testing.T) {
 	data := make([]byte, 512)
 	data[0] = 0x08

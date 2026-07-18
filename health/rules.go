@@ -264,7 +264,7 @@ func evaluateNVMe(d smart.Disk) []Violation {
 				add(a, Warning, u64s(a.Raw)+"% used", "< 80%")
 			}
 		case smart.NVMeTemperature:
-			addNVMeTemperatureViolation(add, a)
+			addNVMeTemperatureViolation(add, a, d.NVMeWarningTempThresholdK, d.NVMeCriticalTempThresholdK)
 		case smart.NVMeCriticalWarning, smart.NVMeEnduranceGroupCriticalWarning:
 			if a.Raw != 0 {
 				add(a, Critical, nvmeCriticalWarningText(a.Raw), "= 0")
@@ -277,7 +277,9 @@ func evaluateNVMe(d smart.Disk) []Violation {
 			}
 		default:
 			if a.ID >= smart.NVMeTemperatureSensor1 && a.ID <= smart.NVMeTemperatureSensor8 {
-				addNVMeTemperatureViolation(add, a)
+				// Controller WCTEMP/CCTEMP apply to the composite temperature;
+				// individual sensors retain the documented generic fallback.
+				addNVMeTemperatureViolation(add, a, 0, 0)
 			}
 		}
 	}
@@ -297,13 +299,19 @@ func evaluateNVMe(d smart.Disk) []Violation {
 	return vs
 }
 
-func addNVMeTemperatureViolation(add func(smart.Attr, Severity, string, string), a smart.Attr) {
+func addNVMeTemperatureViolation(add func(smart.Attr, Severity, string, string), a smart.Attr, warningK, criticalK uint64) {
 	k := a.Raw
 	c := int(k) - 273
-	if k > 333 {
-		add(a, Critical, its(c)+"°C", "≤ 60°C")
-	} else if k > 328 {
-		add(a, Warning, its(c)+"°C", "≤ 55°C")
+	if warningK == 0 {
+		warningK = 328 // 55°C fallback when the controller omits WCTEMP.
+	}
+	if criticalK == 0 || criticalK <= warningK {
+		warningK, criticalK = 328, 333 // 55°C/60°C fallback for an invalid pair.
+	}
+	if k >= criticalK {
+		add(a, Critical, its(c)+"°C", "< "+its(int(criticalK)-273)+"°C")
+	} else if k >= warningK {
+		add(a, Warning, its(c)+"°C", "< "+its(int(warningK)-273)+"°C")
 	}
 }
 

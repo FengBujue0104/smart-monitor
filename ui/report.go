@@ -323,7 +323,7 @@ func attrRawStr(a smart.Attr) string {
 		switch a.ID {
 		case smart.NVMeCriticalWarning, smart.NVMeEnduranceGroupCriticalWarning:
 			return fmt.Sprintf("0x%02X", a.Raw)
-		case smart.NVMeTemperature:
+		case smart.NVMeTemperature, smart.NVMeWarningCompositeTempThreshold, smart.NVMeCriticalCompositeTempThreshold:
 			if a.Raw == 0 {
 				return "N/A"
 			}

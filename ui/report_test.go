@@ -33,6 +33,9 @@ func TestAttrDisplaySeparatesRawAndNormalizedValues(t *testing.T) {
 	if got := attrRawStr(smart.Attr{ID: smart.NVMeTemperature, Kind: "nvme"}); got != "N/A" {
 		t.Fatalf("unexpected unavailable NVMe temperature display: %q", got)
 	}
+	if got := attrRawStr(smart.Attr{ID: smart.NVMeCriticalCompositeTempThreshold, Raw: 343, Kind: "nvme"}); got != "70°C" {
+		t.Fatalf("unexpected NVMe critical temperature threshold display: %q", got)
+	}
 
 	nvmeWrite := smart.Attr{ID: smart.NVMeDataUnitsWritten, Raw: 1000000, Kind: "nvme"}
 	if got := attrRawStr(nvmeWrite); !strings.Contains(got, "0.51 TB") || !strings.Contains(got, "1000000 units") {

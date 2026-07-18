@@ -171,12 +171,14 @@ func Discover() ([]Disk, error) {
 		switch {
 		case busType == storageBusTypeNVMe:
 			d.Kind = KindNVMe
-			attrs, err := ReadNVMeHealth(h)
+			attrs, warningTempK, criticalTempK, err := ReadNVMeHealthWithThresholds(h)
 			if err != nil {
 				// 降级：仍返回空 Attrs 的盘
 				d.Kind = KindNVMe
 			}
 			d.Attrs = attrs
+			d.NVMeWarningTempThresholdK = warningTempK
+			d.NVMeCriticalTempThresholdK = criticalTempK
 		case !storageBusSupportsSMART(busType):
 			d.Kind = KindUnknown
 		default:

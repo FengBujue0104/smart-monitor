@@ -14,14 +14,28 @@ import (
 // 数据缓冲区通过 DataFromDeviceBufferOffset 指定，不能简单按「头 + 数据」拼接。
 
 const (
-	STORAGE_PROTOCOL_TYPE_NVMe = 0x01
-	NVMeGetLogPage             = 0x02
-	NVMeLogID_SMART_Health     = 0x02
+	STORAGE_PROTOCOL_TYPE_NVMe  = 0x01
+	NVMeGetLogPage              = 0x02
+	NVMeIdentify                = 0x06
+	NVMeLogID_SMART_Health      = 0x02
+	NVMeIdentifyController      = 0x01
+	nvmeIdentifyControllerBytes = 4096
 )
 
 // buildNVMeGetLogPage 构造 Get Log Page 命令缓冲区。
 // 返回 [命令头][数据缓冲区] 拼接后的字节。
 func buildNVMeGetLogPage(logID uint8, lenBytes int) []byte {
+	if lenBytes <= 0 || lenBytes%4 != 0 {
+		return nil
+	}
+	cdw10 := (uint32(lenBytes/4-1) << 16) | uint32(logID)
+	return buildNVMeAdminCommand(NVMeGetLogPage, lenBytes, cdw10)
+}
+
+// buildNVMeAdminCommand builds a STORAGE_PROTOCOL_COMMAND containing an NVMe
+// admin command with a data-in buffer. Both Get Log Page and Identify use this
+// standard Windows transport.
+func buildNVMeAdminCommand(opcode uint8, lenBytes int, cdw10 uint32) []byte {
 	const (
 		protocolHeaderSize = 80
 		commandOffset      = 80
@@ -42,9 +56,7 @@ func buildNVMeGetLogPage(logID uint8, lenBytes int) []byte {
 	binary.LittleEndian.PutUint32(buf[0x28:0x2C], 10)               // TimeoutValue
 	binary.LittleEndian.PutUint32(buf[0x38:0x3C], STORAGE_PROTOCOL_SPECIFIC_NVME_ADMIN_COMMAND)
 
-	// NVMe Get Log Page command. CDW10 contains NUMDL and LID.
-	buf[commandOffset] = NVMeGetLogPage
-	cdw10 := (uint32(lenBytes/4-1) << 16) | uint32(logID)
+	buf[commandOffset] = opcode
 	binary.LittleEndian.PutUint32(buf[commandOffset+40:commandOffset+44], cdw10)
 	return buf
 }
@@ -52,8 +64,17 @@ func buildNVMeGetLogPage(logID uint8, lenBytes int) []byte {
 // issueNVMeGetLogPage 在已打开的 NVMe 设备上发 Get Log Page 并返回数据缓冲区。
 func issueNVMeGetLogPage(h windows.Handle, logID uint8) ([]byte, error) {
 	buf := buildNVMeGetLogPage(logID, 512)
+	return issueNVMeAdminCommand(h, buf, 512, fmt.Sprintf("logID=0x%02X", logID))
+}
+
+func issueNVMeIdentifyController(h windows.Handle) ([]byte, error) {
+	buf := buildNVMeAdminCommand(NVMeIdentify, nvmeIdentifyControllerBytes, NVMeIdentifyController)
+	return issueNVMeAdminCommand(h, buf, nvmeIdentifyControllerBytes, "identify-controller")
+}
+
+func issueNVMeAdminCommand(h windows.Handle, buf []byte, dataLen int, operation string) ([]byte, error) {
 	if buf == nil {
-		return nil, fmt.Errorf("invalid NVMe log length")
+		return nil, fmt.Errorf("invalid NVMe %s command", operation)
 	}
 	outBuf := make([]byte, len(buf))
 	var bytesReturned uint32
@@ -69,16 +90,16 @@ func issueNVMeGetLogPage(h windows.Handle, logID uint8) ([]byte, error) {
 		nil,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("IOCTL_STORAGE_PROTOCOL_COMMAND logID=0x%02X err=%w", logID, err)
+		return nil, fmt.Errorf("IOCTL_STORAGE_PROTOCOL_COMMAND %s err=%w", operation, err)
 	}
 	if err := parseNVMeProtocolStatus(outBuf); err != nil {
-		return nil, fmt.Errorf("NVMe logID=0x%02X protocol status: %w", logID, err)
+		return nil, fmt.Errorf("NVMe %s protocol status: %w", operation, err)
 	}
 	const dataOffset = 144
-	if bytesReturned < uint32(dataOffset+512) {
+	if bytesReturned < uint32(dataOffset+dataLen) {
 		return nil, fmt.Errorf("NVMe 返回过短: got=%d", bytesReturned)
 	}
-	return append([]byte(nil), outBuf[dataOffset:dataOffset+512]...), nil
+	return append([]byte(nil), outBuf[dataOffset:dataOffset+dataLen]...), nil
 }
 
 func parseNVMeProtocolStatus(buf []byte) error {
@@ -182,13 +203,41 @@ func readNVMeUint128(data []byte, off int) (low, high uint64) {
 	return binary.LittleEndian.Uint64(data[off : off+8]), binary.LittleEndian.Uint64(data[off+8 : off+16])
 }
 
+func parseNVMeCompositeTemperatureThresholds(data []byte) (warningK, criticalK uint64) {
+	// NVMe Identify Controller: WCTEMP at byte 266, CCTEMP at byte 268.
+	if len(data) < 270 {
+		return 0, 0
+	}
+	return uint64(binary.LittleEndian.Uint16(data[266:268])), uint64(binary.LittleEndian.Uint16(data[268:270]))
+}
+
 // ReadNVMeHealth 读取 NVMe 健康日志并返回统一 Attr 列表。
 func ReadNVMeHealth(h windows.Handle) ([]Attr, error) {
+	attrs, _, _, err := ReadNVMeHealthWithThresholds(h)
+	return attrs, err
+}
+
+// ReadNVMeHealthWithThresholds reads the standard health log plus optional
+// controller-declared composite-temperature thresholds. Identify failures do
+// not discard otherwise valid health data.
+func ReadNVMeHealthWithThresholds(h windows.Handle) ([]Attr, uint64, uint64, error) {
 	data, err := issueNVMeGetLogPage(h, NVMeLogID_SMART_Health)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
-	return parseNVMeHealthLog(data), nil
+	attrs := parseNVMeHealthLog(data)
+	identify, identifyErr := issueNVMeIdentifyController(h)
+	if identifyErr != nil {
+		return attrs, 0, 0, nil
+	}
+	warningK, criticalK := parseNVMeCompositeTemperatureThresholds(identify)
+	if warningK > 0 {
+		attrs = append(attrs, Attr{ID: NVMeWarningCompositeTempThreshold, Name: "Warning_Composite_Temperature_Threshold_Kelvin", Raw: warningK, Kind: "nvme"})
+	}
+	if criticalK > 0 {
+		attrs = append(attrs, Attr{ID: NVMeCriticalCompositeTempThreshold, Name: "Critical_Composite_Temperature_Threshold_Kelvin", Raw: criticalK, Kind: "nvme"})
+	}
+	return attrs, warningK, criticalK, nil
 }
 
 // NVMeIdentify 通过 IOCTL_STORAGE_QUERY_PROPERTY 获取 NVMe 型号/序列号（更可靠）。
