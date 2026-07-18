@@ -264,3 +264,23 @@ func TestSKHynixProfilesUseSourceDefinedUnitsAndLife(t *testing.T) {
 		}
 	}
 }
+
+func TestSanDiskProfilesUseSourceDefinedUnitsAndLife(t *testing.T) {
+	for _, test := range []struct {
+		model string
+		unit  ATACounterUnit
+	}{
+		{"SanDisk X400 2.5 7MM 256GB", ATACounterUnit512B},
+		{"SanDisk SSD PLUS 480GB", ATACounterUnitGB},
+	} {
+		if got, ok := ATACounterUnitForModel(test.model, 0xF1); !ok || got != test.unit {
+			t.Fatalf("SanDisk counter unit for %q = %v, %v; want %v, true", test.model, got, ok, test.unit)
+		}
+		if got, ok := ATAHealthPercentForModel(test.model, []Attr{{ID: 0xE6, Raw: 0x5F00}}); !ok || got != 5 {
+			t.Fatalf("SanDisk life for %q = %d, %v; want 5, true", test.model, got, ok)
+		}
+	}
+	if _, ok := ATACounterUnitForModel("SanDisk SSD P4 USB Memory", 0xF1); ok {
+		t.Fatal("SanDisk USB P4 must not use SATA profile")
+	}
+}

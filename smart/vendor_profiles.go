@@ -84,9 +84,28 @@ func currentE9RemainingHealth(attrs []Attr) (int, bool) {
 	return a.Value, a.Value >= 0 && a.Value <= 100
 }
 
+func sandiskRemainingHealth(attrs []Attr) (int, bool) {
+	a, ok := attrByID(attrs, 0xE6)
+	if !ok {
+		return 0, false
+	}
+	life := 100 - int((a.Raw>>8)&0xFF)
+	return life, life >= 0 && life <= 100
+}
+
 func isSKHynixSATA(model string) bool {
 	m := strings.ToUpper(model)
 	return strings.Contains(m, "SK HYNIX") || strings.HasPrefix(m, "HFS") || strings.HasPrefix(m, "SHG")
+}
+
+func isSanDiskSATA(model string) bool {
+	m := strings.ToLower(model)
+	return strings.Contains(m, "sandisk") && !strings.Contains(m, "ssd p4") && !strings.Contains(m, "issd p4")
+}
+
+func isSanDisk512BCounterModel(model string) bool {
+	m := strings.ToUpper(model)
+	return strings.Contains(m, "X400") || strings.Contains(m, "X300") || strings.Contains(m, "X110") || strings.Contains(m, "SD5") || (strings.Contains(m, "X600") && strings.Contains(m, "2280"))
 }
 
 var ataVendorProfiles = []ataVendorProfile{
@@ -201,6 +220,24 @@ var ataVendorProfiles = []ataVendorProfile{
 		aliases:         map[int]string{0xE9: "SSD_Life_Left", 0xF1: "Host_Writes_GB", 0xF2: "Host_Reads_GB"},
 		counterUnits:    map[int]ATACounterUnit{0xF1: ATACounterUnitGB, 0xF2: ATACounterUnitGB},
 		remainingHealth: currentE9RemainingHealth,
+	},
+	{
+		name:    "SanDisk SATA 512 B",
+		matches: func(model string) bool { return isSanDiskSATA(model) && isSanDisk512BCounterModel(model) },
+		aliases: map[int]string{
+			0xE6: "Media_Wearout_Indicator", 0xF1: "Host_Writes", 0xF2: "Host_Reads",
+		},
+		counterUnits:    map[int]ATACounterUnit{0xF1: ATACounterUnit512B, 0xF2: ATACounterUnit512B},
+		remainingHealth: sandiskRemainingHealth,
+	},
+	{
+		name:    "SanDisk SATA GB",
+		matches: isSanDiskSATA,
+		aliases: map[int]string{
+			0xE6: "Media_Wearout_Indicator", 0xF1: "Host_Writes_GB", 0xF2: "Host_Reads_GB",
+		},
+		counterUnits:    map[int]ATACounterUnit{0xF1: ATACounterUnitGB, 0xF2: ATACounterUnitGB},
+		remainingHealth: sandiskRemainingHealth,
 	},
 	{
 		name: "Western Digital SATA",
