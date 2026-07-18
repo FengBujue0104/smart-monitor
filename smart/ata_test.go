@@ -284,3 +284,20 @@ func TestSanDiskProfilesUseSourceDefinedUnitsAndLife(t *testing.T) {
 		t.Fatal("SanDisk USB P4 must not use SATA profile")
 	}
 }
+
+func TestMicronProfilesUseSourceDefinedUnitsAndLife(t *testing.T) {
+	micron := "Micron M600 SATA 256GB"
+	if got, ok := ATACounterUnitForModel(micron, 0xF1); !ok || got != ATACounterUnit512B {
+		t.Fatalf("Micron M600 counter unit = %v, %v", got, ok)
+	}
+	if got, ok := ATAHealthPercentForModel(micron, []Attr{{ID: 0xCA, Value: 7}}); !ok || got != 7 {
+		t.Fatalf("Micron M600 remaining life = %d, %v", got, ok)
+	}
+	crucial := "CT1000MX500SSD1"
+	if got, ok := ATAHealthPercentForModel(crucial, []Attr{{ID: 0xCA, Value: 90}}); !ok || got != 90 {
+		t.Fatalf("Crucial MX500 remaining life = %d, %v", got, ok)
+	}
+	if got, ok := ATAHealthPercentForModel("Crucial M4 CT128M4SSD2", []Attr{{ID: 0xCA, Value: 80}}); !ok || got != 80 {
+		t.Fatalf("Crucial M4 remaining life = %d, %v", got, ok)
+	}
+}

@@ -180,6 +180,14 @@ func evaluateATA(d smart.Disk) []Violation {
 			} else if a.Value > 0 && a.Value <= 20 {
 				add(a, Warning, its(a.Value)+"% (remaining)", "> 20%")
 			}
+		case 0xCA: // Micron/Crucial SSD remaining-life attribute
+			if life, ok := smart.ATAHealthPercentForModel(d.Model, []smart.Attr{a}); ok {
+				if life == 0 {
+					add(a, Critical, "0% (remaining)", "> 0%")
+				} else if life <= 10 {
+					add(a, Warning, its(life)+"% (remaining)", "> 10%")
+				}
+			}
 		case 0xE6: // WD Blue SA510 Media_Wearout_Indicator
 			// CrystalDiskInfo reads remaining life from raw byte 1 for this
 			// model and marks <=10% caution, 0% failure. Other E6 meanings are
@@ -232,7 +240,7 @@ func shouldApplyGenericATAThreshold(d smart.Disk, a smart.Attr) bool {
 		return false
 	}
 	switch a.ID {
-	case 0x01, 0x05, 0xBB, 0xBC, 0xC5, 0xC6, 0xE8, 0xE9, 0xAD, 0xB1:
+	case 0x01, 0x05, 0xBB, 0xBC, 0xC5, 0xC6, 0xCA, 0xE8, 0xE9, 0xAD, 0xB1:
 		return false
 	}
 	return true

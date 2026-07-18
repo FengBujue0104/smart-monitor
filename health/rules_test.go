@@ -133,6 +133,24 @@ func TestSanDiskE6LifeUsesCrystalDiskInfoThreshold(t *testing.T) {
 	}
 }
 
+func TestMicronCALifeUsesCrystalDiskInfoThreshold(t *testing.T) {
+	d := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "Micron M600 SATA 256GB", Attrs: []smart.Attr{{ID: 0xCA, Value: 5}}}
+	got := Evaluate([]smart.Disk{d})
+	if len(got) != 1 || got[0].Severity != Warning || got[0].Current != "5% (remaining)" {
+		t.Fatalf("unexpected Micron CA low-life warning: %+v", got)
+	}
+}
+
+func TestMicronCALifeDoesNotDuplicateDeviceThreshold(t *testing.T) {
+	d := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "Micron M600 SATA 256GB", Attrs: []smart.Attr{{
+		ID: 0xCA, Name: "SSD_Life_Left", Value: 5, Thresh: 10, Flags: 1,
+	}}}
+	got := Evaluate([]smart.Disk{d})
+	if len(got) != 1 || got[0].Severity != Warning || got[0].Current != "5% (remaining)" {
+		t.Fatalf("CA remaining-life violation = %+v, want one warning", got)
+	}
+}
+
 // TestCrystalDiskInfoExportedHealthyDisksRemainHealthy is a regression fixture
 // transcribed from CrystalDiskInfo_20260718090515.txt. CrystalDiskInfo reports
 // KIOXIA-EXCERIA at 96% and WD Blue SA510 at 98%, both in good condition.

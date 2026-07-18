@@ -93,6 +93,14 @@ func sandiskRemainingHealth(attrs []Attr) (int, bool) {
 	return life, life >= 0 && life <= 100
 }
 
+func currentCARemainingHealth(attrs []Attr) (int, bool) {
+	a, ok := attrByID(attrs, 0xCA)
+	if !ok {
+		return 0, false
+	}
+	return a.Value, a.Value >= 0 && a.Value <= 100
+}
+
 func isSKHynixSATA(model string) bool {
 	m := strings.ToUpper(model)
 	return strings.Contains(m, "SK HYNIX") || strings.HasPrefix(m, "HFS") || strings.HasPrefix(m, "SHG")
@@ -106,6 +114,25 @@ func isSanDiskSATA(model string) bool {
 func isSanDisk512BCounterModel(model string) bool {
 	m := strings.ToUpper(model)
 	return strings.Contains(m, "X400") || strings.Contains(m, "X300") || strings.Contains(m, "X110") || strings.Contains(m, "SD5") || (strings.Contains(m, "X600") && strings.Contains(m, "2280"))
+}
+
+func isMicron512BCounterModel(model string) bool {
+	m := strings.ToUpper(model)
+	for _, family := range []string{"MICRON_M600", "MICRON M600", "MICRON_M550", "MICRON M550", "MICRON_M510", "MICRON M510", "MICRON_M500", "MICRON M500", "MICRON_1300", "MICRON 1300", "MICRON_1100", "MICRON 1100", "MTFDDA"} {
+		if strings.Contains(m, family) {
+			return true
+		}
+	}
+	return false
+}
+
+func isMicronSATA(model string) bool {
+	m := strings.ToUpper(model)
+	return strings.Contains(m, "MICRON") || strings.Contains(m, "MTFD")
+}
+
+func isCrucialSATA(model string) bool {
+	return strings.Contains(strings.ToUpper(model), "CRUCIAL")
 }
 
 var ataVendorProfiles = []ataVendorProfile{
@@ -161,10 +188,33 @@ var ataVendorProfiles = []ataVendorProfile{
 		remainingHealth: samsungRemainingHealth,
 	},
 	{
-		name:         "Crucial MX/BX SATA",
-		matches:      IsCrucial32MBHostCounterModel,
-		aliases:      map[int]string{0xF1: "Host_Writes", 0xF2: "Host_Reads"},
-		counterUnits: map[int]ATACounterUnit{0xF1: ATACounterUnit32MB, 0xF2: ATACounterUnit32MB},
+		name:            "Crucial MX/BX SATA",
+		matches:         IsCrucial32MBHostCounterModel,
+		aliases:         map[int]string{0xCA: "SSD_Life_Left", 0xF1: "Host_Writes", 0xF2: "Host_Reads"},
+		counterUnits:    map[int]ATACounterUnit{0xF1: ATACounterUnit32MB, 0xF2: ATACounterUnit32MB},
+		remainingHealth: currentCARemainingHealth,
+	},
+	{
+		// CrystalDiskInfo identifies the remaining Crucial SATA families as
+		// Micron-derived drives. CA is their normalized remaining-life field,
+		// but the F1/F2 unit is not uniform across those older families.
+		name:            "Crucial SATA",
+		matches:         isCrucialSATA,
+		aliases:         map[int]string{0xCA: "SSD_Life_Left"},
+		remainingHealth: currentCARemainingHealth,
+	},
+	{
+		name:            "Micron SATA 512 B",
+		matches:         isMicron512BCounterModel,
+		aliases:         map[int]string{0xCA: "SSD_Life_Left", 0xF1: "Host_Writes", 0xF2: "Host_Reads"},
+		counterUnits:    map[int]ATACounterUnit{0xF1: ATACounterUnit512B, 0xF2: ATACounterUnit512B},
+		remainingHealth: currentCARemainingHealth,
+	},
+	{
+		name:            "Micron SATA",
+		matches:         isMicronSATA,
+		aliases:         map[int]string{0xCA: "SSD_Life_Left"},
+		remainingHealth: currentCARemainingHealth,
 	},
 	{
 		name:         "Intel/Solidigm SATA",
