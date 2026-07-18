@@ -341,3 +341,21 @@ func TestMicronProfilesUseSourceDefinedUnitsAndLife(t *testing.T) {
 		t.Fatalf("Crucial M4 remaining life = %d, %v", got, ok)
 	}
 }
+
+func TestIntelDCAndPlextorProfilesUseSourceDefinedFields(t *testing.T) {
+	intelDC := "INTEL SSDSCKHB480G7"
+	if got, ok := ATAHealthPercentForModel(intelDC, []Attr{{ID: 0xCA, Value: 8}}); !ok || got != 8 {
+		t.Fatalf("Intel DC CA life = %d, %v", got, ok)
+	}
+	if got, ok := ATACounterUnitForModel(intelDC, 0xEB); !ok || got != ATACounterUnit32MB {
+		t.Fatalf("Intel DC EB unit = %v, %v", got, ok)
+	}
+
+	plextor := "PLEXTOR PX-256M5Pro"
+	if got, ok := ATAHealthPercentForModel(plextor, []Attr{{ID: 0xE8, Value: 7}}); !ok || got != 7 {
+		t.Fatalf("Plextor E8 life = %d, %v", got, ok)
+	}
+	if got, ok := ATACounterUnitForModel(plextor, 0xF2); !ok || got != ATACounterUnit32MB {
+		t.Fatalf("Plextor F2 unit = %v, %v", got, ok)
+	}
+}

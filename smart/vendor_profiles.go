@@ -101,6 +101,14 @@ func currentCARemainingHealth(attrs []Attr) (int, bool) {
 	return a.Value, a.Value >= 0 && a.Value <= 100
 }
 
+func currentE8RemainingHealth(attrs []Attr) (int, bool) {
+	a, ok := attrByID(attrs, 0xE8)
+	if !ok {
+		return 0, false
+	}
+	return a.Value, a.Value >= 0 && a.Value <= 100
+}
+
 func isSKHynixSATA(model string) bool {
 	m := strings.ToUpper(model)
 	return strings.Contains(m, "SK HYNIX") || strings.HasPrefix(m, "HFS") || strings.HasPrefix(m, "SHG")
@@ -133,6 +141,16 @@ func isMicronSATA(model string) bool {
 
 func isCrucialSATA(model string) bool {
 	return strings.Contains(strings.ToUpper(model), "CRUCIAL")
+}
+
+func isIntelDCSATAModel(model string) bool {
+	return strings.Contains(strings.ToUpper(model), "INTEL SSDSCKHB")
+}
+
+func isPlextorSATA(model string) bool {
+	m := strings.ToUpper(model)
+	return strings.HasPrefix(m, "PLEXTOR") || strings.HasPrefix(m, "LITEON") || strings.Contains(m, "CV6-CQ") ||
+		strings.HasPrefix(m, "CSSD-S6T128NM3PQ") || strings.HasPrefix(m, "CSSD-S6T256NM3PQ")
 }
 
 var ataVendorProfiles = []ataVendorProfile{
@@ -217,10 +235,28 @@ var ataVendorProfiles = []ataVendorProfile{
 		remainingHealth: currentCARemainingHealth,
 	},
 	{
+		// Intel's SSDSCKHB DC branch uses different IDs from its consumer SATA
+		// drives: CA is remaining life, F1 is NAND writes, and EB host writes.
+		name:            "Intel DC SSDSCKHB SATA",
+		matches:         isIntelDCSATAModel,
+		aliases:         map[int]string{0xCA: "SSD_Life_Left", 0xEB: "Host_Writes", 0xF1: "NAND_Writes"},
+		counterUnits:    map[int]ATACounterUnit{0xEB: ATACounterUnit32MB, 0xF1: ATACounterUnit32MB},
+		remainingHealth: currentCARemainingHealth,
+	},
+	{
 		name:         "Intel/Solidigm SATA",
 		matches:      IsIntelOrSolidigmSATAModel,
 		aliases:      map[int]string{0xF1: "Host_Writes", 0xF3: "NAND_Writes"},
 		counterUnits: map[int]ATACounterUnit{0xF1: ATACounterUnit32MB, 0xF3: ATACounterUnit32MB},
+	},
+	{
+		// CrystalDiskInfo groups these Plextor/LiteOn SATA models together;
+		// E8 is remaining life and F1/F2 use 32 MB host-I/O units.
+		name:            "Plextor/LiteOn SATA",
+		matches:         isPlextorSATA,
+		aliases:         map[int]string{0xE8: "SSD_Life_Left", 0xF1: "Host_Writes", 0xF2: "Host_Reads"},
+		counterUnits:    map[int]ATACounterUnit{0xF1: ATACounterUnit32MB, 0xF2: ATACounterUnit32MB},
+		remainingHealth: currentE8RemainingHealth,
 	},
 	{
 		name:         "Kingston KC600",

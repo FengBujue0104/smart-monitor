@@ -200,6 +200,14 @@ func evaluateATA(d smart.Disk) []Violation {
 				}
 			}
 		case 0xE8: // Available_Reservd_Space (Samsung=life %; WD/Crucial=预留%)
+			if life, ok := smart.ATAHealthPercentForModel(d.Model, []smart.Attr{a}); ok {
+				if life == 0 {
+					add(a, Critical, "0% (remaining)", "> 0%")
+				} else if life <= 10 {
+					add(a, Warning, its(life)+"% (remaining)", "> 10%")
+				}
+				break
+			}
 			if a.Value > 0 && a.Value <= 10 {
 				add(a, Warning, its(a.Value)+"%", "> 10%")
 			}

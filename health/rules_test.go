@@ -151,6 +151,19 @@ func TestMicronCALifeDoesNotDuplicateDeviceThreshold(t *testing.T) {
 	}
 }
 
+func TestPlextorE8LifeUsesModelScopedRule(t *testing.T) {
+	plextor := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "PLEXTOR PX-256M5Pro", Attrs: []smart.Attr{{ID: 0xE8, Value: 5}}}
+	got := Evaluate([]smart.Disk{plextor})
+	if len(got) != 1 || got[0].Severity != Warning || got[0].Current != "5% (remaining)" {
+		t.Fatalf("Plextor E8 low-life warning = %+v", got)
+	}
+	intelDC := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "INTEL SSDSCKHB480G7", Attrs: []smart.Attr{{ID: 0xCA, Value: 0}}}
+	got = Evaluate([]smart.Disk{intelDC})
+	if len(got) != 1 || got[0].Severity != Critical || got[0].Current != "0% (remaining)" {
+		t.Fatalf("Intel DC CA end-of-life = %+v", got)
+	}
+}
+
 // TestCrystalDiskInfoExportedHealthyDisksRemainHealthy is a regression fixture
 // transcribed from CrystalDiskInfo_20260718090515.txt. CrystalDiskInfo reports
 // KIOXIA-EXCERIA at 96% and WD Blue SA510 at 98%, both in good condition.
