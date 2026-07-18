@@ -417,6 +417,9 @@ func diskSummary(d smart.Disk) string {
 	if d.SMARTTransport != "" {
 		summary += " [" + d.SMARTTransport + "]"
 	}
+	if profile := smart.ATAVendorProfileName(d.Model); profile != "" {
+		summary += " [" + profile + "]"
+	}
 	if len(d.Attrs) == 0 {
 		if d.Kind == smart.KindUnknown {
 			return summary + " [SMART不适用]"

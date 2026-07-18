@@ -284,6 +284,15 @@ func TestATAVendorProfilesUseSpecificMatchBeforeGenericMatch(t *testing.T) {
 	}
 }
 
+func TestATAVendorProfileNameOnlyReportsVerifiedMatches(t *testing.T) {
+	if got := ATAVendorProfileName("WD Blue SA510 2.5 500GB SSD"); got != "WD Blue SA510" {
+		t.Fatalf("WD Blue profile name = %q", got)
+	}
+	if got := ATAVendorProfileName("Generic SATA SSD"); got != "" {
+		t.Fatalf("generic SATA profile name = %q, want empty", got)
+	}
+}
+
 func TestSKHynixProfilesUseSourceDefinedUnitsAndLife(t *testing.T) {
 	for _, test := range []struct {
 		model string

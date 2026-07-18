@@ -109,6 +109,13 @@ func TestDiskSummaryShowsSuccessfulSMARTTransport(t *testing.T) {
 	}
 }
 
+func TestDiskSummaryShowsSelectedATAVendorProfile(t *testing.T) {
+	d := smart.Disk{Model: "WD Blue SA510 2.5 500GB SSD", Attrs: []smart.Attr{{ID: 0xE6, Raw: 0x0200}}}
+	if got := diskSummary(d); !strings.Contains(got, "WD Blue SA510") {
+		t.Fatalf("disk summary does not show ATA profile: %q", got)
+	}
+}
+
 func TestAttrRawStrForModelShowsSiliconMotionCVCGBCounter(t *testing.T) {
 	got := attrRawStrForModel("CVC-128G SATA SSD", smart.Attr{ID: 0xF1, Raw: 1234, Kind: "ata"})
 	if got != "1234 GB" {

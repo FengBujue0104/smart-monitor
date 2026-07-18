@@ -23,6 +23,15 @@ func ataVendorProfileForModel(model string) *ataVendorProfile {
 	return nil
 }
 
+// ATAVendorProfileName reports the source-verified ATA profile selected for a
+// model. An empty result means the drive uses standard ATA interpretation.
+func ATAVendorProfileName(model string) string {
+	if profile := ataVendorProfileForModel(model); profile != nil {
+		return profile.name
+	}
+	return ""
+}
+
 func attrByID(attrs []Attr, id int) (Attr, bool) {
 	for _, a := range attrs {
 		if a.ID == id {
