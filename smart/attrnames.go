@@ -135,6 +135,32 @@ func IsYMTCSATAModel(model string) bool {
 	return strings.Contains(m, "zhitai") || strings.Contains(model, "致态")
 }
 
+// ATAHealthPercentForModel returns a vendor-defined remaining-life percentage
+// only where the interpretation is verified by CrystalDiskInfo and a model
+// match. The ATA standard does not assign a universal SSD-life attribute.
+func ATAHealthPercentForModel(model string, attrs []Attr) (int, bool) {
+	m := strings.ToLower(model)
+	for _, a := range attrs {
+		switch {
+		case strings.Contains(m, "kioxia") && a.ID == 0xAD:
+			// CrystalDiskInfo AtaSmart.cpp: KIOXIA AD stores life as
+			// normalized current value minus 100 (e.g. 196 -> 96%).
+			life := a.Value - 100
+			if life > 0 && life <= 100 {
+				return life, true
+			}
+		case strings.Contains(m, "wd blue sa510") && a.ID == 0xE6:
+			// CrystalDiskInfo's WDC E6 rule stores used percentage in
+			// raw byte 1; this was cross-checked with the exported SA510 report.
+			life := 100 - int((a.Raw>>8)&0xFF)
+			if life >= 0 && life <= 100 {
+				return life, true
+			}
+		}
+	}
+	return 0, false
+}
+
 func uitoa(v int) string {
 	const hex = "0123456789ABCDEF"
 	if v < 16 {

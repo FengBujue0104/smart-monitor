@@ -140,3 +140,17 @@ func TestATATemperatureAttributeForModelLimitsF3ToYMTC(t *testing.T) {
 		t.Fatal("unexpected YMTC model identification")
 	}
 }
+
+func TestATAHealthPercentForVerifiedCrystalDiskInfoModels(t *testing.T) {
+	kioxia := []Attr{{ID: 0xAD, Value: 196}}
+	if got, ok := ATAHealthPercentForModel("KIOXIA-EXCERIA SATA SSD", kioxia); !ok || got != 96 {
+		t.Fatalf("KIOXIA health = %d, %v; want 96, true", got, ok)
+	}
+	wd := []Attr{{ID: 0xE6, Raw: 0x025000560250}}
+	if got, ok := ATAHealthPercentForModel("WD Blue SA510 2.5 500GB SSD", wd); !ok || got != 98 {
+		t.Fatalf("WD Blue SA510 health = %d, %v; want 98, true", got, ok)
+	}
+	if _, ok := ATAHealthPercentForModel("Generic SSD", wd); ok {
+		t.Fatal("generic E6 must not be assigned a vendor health percentage")
+	}
+}

@@ -76,6 +76,17 @@ func TestDiskSummaryShowsOverallSMARTStatusWhenKnown(t *testing.T) {
 	}
 }
 
+func TestDiskSummaryShowsVerifiedCrystalDiskInfoHealthPercent(t *testing.T) {
+	kioxia := smart.Disk{Model: "KIOXIA-EXCERIA SATA SSD", Attrs: []smart.Attr{{ID: 0xAD, Value: 196}}}
+	if got := diskSummary(kioxia); !strings.Contains(got, "健康度 96%") {
+		t.Fatalf("unexpected KIOXIA health summary: %q", got)
+	}
+	wd := smart.Disk{Model: "WD Blue SA510 2.5 500GB SSD", Attrs: []smart.Attr{{ID: 0xE6, Raw: 0x025000560250}}}
+	if got := diskSummary(wd); !strings.Contains(got, "健康度 98%") {
+		t.Fatalf("unexpected WD Blue health summary: %q", got)
+	}
+}
+
 func TestDiskSummaryShowsChecksumWarning(t *testing.T) {
 	d := smart.Disk{Model: "Test HDD", SMARTChecksumKnown: true, SMARTChecksumValid: false, Attrs: []smart.Attr{{ID: 1}}}
 	if got := diskSummary(d); !strings.Contains(got, "校验和异常") || smartChecksumText(d) != "异常" {
