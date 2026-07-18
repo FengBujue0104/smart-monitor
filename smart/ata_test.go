@@ -369,3 +369,13 @@ func TestSiliconMotionCVCProfileUsesSourceDefinedFields(t *testing.T) {
 		t.Fatalf("CVC F1 unit = %v, %v", got, ok)
 	}
 }
+
+func TestSsstcProfileUsesSourceDefinedLifeField(t *testing.T) {
+	model := "CV8-8E256-HP"
+	if got, ok := ATAHealthPercentForModel(model, []Attr{{ID: 0xE7, Value: 9}}); !ok || got != 9 {
+		t.Fatalf("SSSTC E7 life = %d, %v", got, ok)
+	}
+	if _, ok := ATACounterUnitForModel(model, 0xF1); ok {
+		t.Fatal("SSSTC F1 must remain raw when no common source unit exists")
+	}
+}

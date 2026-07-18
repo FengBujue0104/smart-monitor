@@ -109,6 +109,14 @@ func currentE8RemainingHealth(attrs []Attr) (int, bool) {
 	return a.Value, a.Value >= 0 && a.Value <= 100
 }
 
+func currentE7RemainingHealth(attrs []Attr) (int, bool) {
+	a, ok := attrByID(attrs, 0xE7)
+	if !ok {
+		return 0, false
+	}
+	return a.Value, a.Value >= 0 && a.Value <= 100
+}
+
 func isSKHynixSATA(model string) bool {
 	m := strings.ToUpper(model)
 	return strings.Contains(m, "SK HYNIX") || strings.HasPrefix(m, "HFS") || strings.HasPrefix(m, "SHG")
@@ -155,6 +163,11 @@ func isPlextorSATA(model string) bool {
 
 func isSiliconMotionCVCSATA(model string) bool {
 	return strings.Contains(strings.ToUpper(model), "CVC-")
+}
+
+func isSsstcSATA(model string) bool {
+	m := strings.ToUpper(model)
+	return strings.Contains(m, "CV8-") || strings.Contains(m, "CVB-") || strings.Contains(m, "ER2-")
 }
 
 var ataVendorProfiles = []ataVendorProfile{
@@ -270,6 +283,15 @@ var ataVendorProfiles = []ataVendorProfile{
 		aliases:         map[int]string{0xCA: "SSD_Life_Left", 0xF1: "Host_Writes_GB", 0xF2: "Host_Reads_GB"},
 		counterUnits:    map[int]ATACounterUnit{0xF1: ATACounterUnitGB, 0xF2: ATACounterUnitGB},
 		remainingHealth: currentCARemainingHealth,
+	},
+	{
+		// SSSTC (Kioxia OEM) CV8/CVB/ER2 SATA models expose remaining life in
+		// normalized E7. CrystalDiskInfo does not assign one common F1/F2 unit
+		// to this family, so those counters deliberately remain raw values.
+		name:            "SSSTC SATA",
+		matches:         isSsstcSATA,
+		aliases:         map[int]string{0xE7: "SSD_Life_Left"},
+		remainingHealth: currentE7RemainingHealth,
 	},
 	{
 		name:         "Kingston KC600",

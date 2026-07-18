@@ -199,6 +199,14 @@ func evaluateATA(d smart.Disk) []Violation {
 					add(a, Warning, its(life)+"% (remaining)", "> 10%")
 				}
 			}
+		case 0xE7: // SSSTC remaining-life field
+			if life, ok := smart.ATAHealthPercentForModel(d.Model, []smart.Attr{a}); ok {
+				if life == 0 {
+					add(a, Critical, "0% (remaining)", "> 0%")
+				} else if life <= 10 {
+					add(a, Warning, its(life)+"% (remaining)", "> 10%")
+				}
+			}
 		case 0xE8: // Available_Reservd_Space (Samsung=life %; WD/Crucial=预留%)
 			if life, ok := smart.ATAHealthPercentForModel(d.Model, []smart.Attr{a}); ok {
 				if life == 0 {
@@ -246,6 +254,11 @@ func evaluateATA(d smart.Disk) []Violation {
 func shouldApplyGenericATAThreshold(d smart.Disk, a smart.Attr) bool {
 	if smart.ATATemperatureAttributeForModel(d.Model, a.ID) {
 		return false
+	}
+	if a.ID == 0xE7 {
+		if _, ok := smart.ATAHealthPercentForModel(d.Model, []smart.Attr{a}); ok {
+			return false
+		}
 	}
 	switch a.ID {
 	case 0x01, 0x05, 0xBB, 0xBC, 0xC5, 0xC6, 0xCA, 0xE8, 0xE9, 0xAD, 0xB1:
