@@ -118,6 +118,13 @@ func ATAAttrNameForModel(model string, id int) string {
 		case 0xF2:
 			return "Host_Reads"
 		}
+	case IsToshiba32MBHostCounterModel(model):
+		switch id {
+		case 0xF1:
+			return "Host_Writes"
+		case 0xF2:
+			return "Host_Reads"
+		}
 	case strings.Contains(m, "western digital") || strings.Contains(m, "wd "):
 		switch id {
 		case 0xC4:
@@ -200,6 +207,18 @@ func IsIntelOrSolidigmSATAModel(model string) bool {
 // which explicitly declares 32 MB host read/write units.
 func IsKingstonKC600Model(model string) bool {
 	return strings.Contains(strings.ToUpper(model), "KC600")
+}
+
+// IsToshiba32MBHostCounterModel matches the explicit Toshiba SATA families
+// for which CrystalDiskInfo's IsSsdToshiba selects 32 MB host I/O units.
+func IsToshiba32MBHostCounterModel(model string) bool {
+	m := strings.ToUpper(model)
+	for _, family := range []string{"THNSNC", "THNSNJ", "THNSNK", "KSG60", "TL100", "TR150", "TR200"} {
+		if strings.Contains(m, family) {
+			return true
+		}
+	}
+	return false
 }
 
 // ATAHealthPercentForModel returns a vendor-defined remaining-life percentage

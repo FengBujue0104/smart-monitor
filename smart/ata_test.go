@@ -131,6 +131,9 @@ func TestATAAttrNameForModelCrystalDiskInfoAliases(t *testing.T) {
 	if got := ATAAttrNameForModel("KINGSTON SKC600512G", 0xF2); got != "Host_Reads" {
 		t.Fatalf("Kingston KC600 F2 alias = %q", got)
 	}
+	if got := ATAAttrNameForModel("TOSHIBA THNSNC128GCSJ", 0xF1); got != "Host_Writes" {
+		t.Fatalf("Toshiba F1 alias = %q", got)
+	}
 	if got := ATAAttrNameForModel("Intel SSD DC S3500", 0xF3); got == "Temperature_Celsius" {
 		t.Fatalf("Intel F3 must not be interpreted as temperature")
 	}
@@ -162,6 +165,9 @@ func TestATATemperatureAttributeForModelLimitsF3ToYMTC(t *testing.T) {
 	}
 	if !IsKingstonKC600Model("KINGSTON SKC600512G") || IsKingstonKC600Model("KINGSTON SA400S37") {
 		t.Fatal("unexpected Kingston KC600 model identification")
+	}
+	if !IsToshiba32MBHostCounterModel("TOSHIBA THNSNC128GCSJ") || !IsToshiba32MBHostCounterModel("TOSHIBA TR200") || IsToshiba32MBHostCounterModel("TOSHIBA Generic SATA") {
+		t.Fatal("unexpected Toshiba 32 MB model identification")
 	}
 }
 
