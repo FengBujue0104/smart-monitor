@@ -1,8 +1,10 @@
 package ui
 
 import (
+	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/lxn/walk"
 	"smonitor/health"
@@ -167,6 +169,37 @@ func TestReportBannerShowsStartupStatusWithoutDialog(t *testing.T) {
 	}
 	if color != walk.RGB(0xB0, 0x20, 0x20) {
 		t.Fatalf("unexpected startup status color: %#v", color)
+	}
+}
+
+func TestDiscoverAsyncDoesNotBlockUIThread(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	result := discoverAsync(func() ([]smart.Disk, error) {
+		close(started)
+		<-release
+		return nil, errors.New("test scan failure")
+	})
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("background scan did not start")
+	}
+	select {
+	case outcome := <-result:
+		t.Fatalf("scan completed before release: %+v", outcome)
+	default:
+	}
+
+	close(release)
+	select {
+	case outcome := <-result:
+		if outcome.err == nil || outcome.err.Error() != "test scan failure" {
+			t.Fatalf("unexpected async result: %+v", outcome)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("background scan result was not delivered")
 	}
 }
 

@@ -23,6 +23,20 @@ type ReportWin struct {
 	rescanning bool
 }
 
+type discoveryResult struct {
+	disks []smart.Disk
+	err   error
+}
+
+func discoverAsync(discover func() ([]smart.Disk, error)) <-chan discoveryResult {
+	result := make(chan discoveryResult, 1)
+	go func() {
+		disks, err := discover()
+		result <- discoveryResult{disks: disks, err: err}
+	}()
+	return result
+}
+
 // RunReport 显示报表。异常统一显示在主窗口横幅和表格中，不创建第二个告警窗口。
 func RunReport(disks []smart.Disk, violations []health.Violation) error {
 	return RunReportWithStatus(disks, violations, "")
@@ -582,18 +596,19 @@ func (rw *ReportWin) rescan() {
 	// SMART IOCTL and WMI probing can take noticeable time on USB/RAID
 	// controllers. Keep that work outside Walk's UI thread, then marshal only
 	// the model replacement back to the window.
+	result := discoverAsync(smart.Discover)
 	go func() {
-		disks, err := smart.Discover()
+		outcome := <-result
 		rw.Synchronize(func() {
 			rw.rescanning = false
 			if rw.rescanBtn != nil {
 				rw.rescanBtn.SetEnabled(true)
 			}
-			if err != nil {
-				rw.showStatus("扫描失败："+err.Error(), walk.RGB(0xB0, 0x20, 0x20))
+			if outcome.err != nil {
+				rw.showStatus("扫描失败："+outcome.err.Error(), walk.RGB(0xB0, 0x20, 0x20))
 				return
 			}
-			if err := rw.setReportData(disks); err != nil {
+			if err := rw.setReportData(outcome.disks); err != nil {
 				rw.showStatus("刷新失败："+err.Error(), walk.RGB(0xB0, 0x20, 0x20))
 			}
 		})
