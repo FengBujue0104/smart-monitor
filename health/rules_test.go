@@ -94,6 +94,43 @@ func TestWDBlueSA510MediaWearoutUsesCrystalDiskInfoLifeRule(t *testing.T) {
 	}
 }
 
+// TestCrystalDiskInfoExportedHealthyDisksRemainHealthy is a regression fixture
+// transcribed from CrystalDiskInfo_20260718090515.txt. CrystalDiskInfo reports
+// KIOXIA-EXCERIA at 96% and WD Blue SA510 at 98%, both in good condition.
+func TestCrystalDiskInfoExportedHealthyDisksRemainHealthy(t *testing.T) {
+	disks := []smart.Disk{
+		{
+			Index: 1, Kind: smart.KindATA, Model: "KIOXIA-EXCERIA SATA SSD",
+			Attrs: []smart.Attr{
+				{ID: 0x09, Raw: 30870, Value: 100, Thresh: 0},
+				{ID: 0xA9, Raw: 0, Value: 100, Thresh: 10},
+				{ID: 0xAD, Raw: 0, Value: 196, Thresh: 0},
+				{ID: 0xC2, Raw: 0x002C00130022, Value: 66, Thresh: 20},
+				{ID: 0xF1, Raw: 0x060F8A, Value: 100, Thresh: 0},
+			},
+		},
+		{
+			Index: 2, Kind: smart.KindATA, Model: "WD Blue SA510 2.5 500GB SSD",
+			Attrs: []smart.Attr{
+				{ID: 0x05, Raw: 0, Value: 100, Thresh: 10},
+				{ID: 0xAD, Raw: 13, Value: 100, Thresh: 5},
+				{ID: 0xB8, Raw: 0, Value: 100, Thresh: 97},
+				{ID: 0xBB, Raw: 0, Value: 100, Thresh: 0},
+				{ID: 0xBC, Raw: 1, Value: 100, Thresh: 0},
+				{ID: 0xC2, Raw: 0x002800140023, Value: 100, Thresh: 14},
+				{ID: 0xE6, Raw: 0x025000560250, Value: 100, Thresh: 0},
+				{ID: 0xE8, Raw: 93, Value: 100, Thresh: 4},
+				{ID: 0xE9, Raw: 5928, Value: 100, Thresh: 0},
+				{ID: 0xF1, Raw: 12153, Value: 253, Thresh: 0},
+				{ID: 0xF2, Raw: 13631, Value: 253, Thresh: 0},
+			},
+		},
+	}
+	if got := Evaluate(disks); len(got) != 0 {
+		t.Fatalf("CrystalDiskInfo-good disks must not produce violations: %+v", got)
+	}
+}
+
 func TestATAOverallSMARTFailureCreatesCriticalViolation(t *testing.T) {
 	d := smart.Disk{Index: 0, Kind: smart.KindATA, SmartStatusKnown: true, SmartStatusPassed: false}
 	got := Evaluate([]smart.Disk{d})
