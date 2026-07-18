@@ -21,7 +21,7 @@ type ReportWin struct {
 	banner     *walk.Label
 }
 
-// RunReport 显示报表。violations 非空时弹出红色告警条。
+// RunReport 显示报表。异常统一显示在主窗口横幅和表格中，不创建第二个告警窗口。
 func RunReport(disks []smart.Disk, violations []health.Violation) error {
 	rw := &ReportWin{disks: disks, violations: violations}
 	model := &reportModel{disks: disks, violations: violations}
@@ -98,9 +98,6 @@ func RunReport(disks []smart.Disk, violations []health.Violation) error {
 		return err
 	}
 
-	if len(violations) > 0 {
-		go showRedAlert(violations)
-	}
 	rw.Run()
 	return nil
 }
@@ -529,9 +526,8 @@ func (rw *ReportWin) simulateFailures() {
 		walk.MsgBox(rw, "模拟失败", err.Error(), walk.MsgBoxIconError)
 		return
 	}
-	walk.MsgBox(rw, "模拟异常已加载", "已载入内存中的 ATA/NVMe 异常场景。\n可检查红黄表格、告警窗口和“复制异常条目”。\n点击“重新扫描”即可恢复真实磁盘数据。", walk.MsgBoxIconInformation)
-	if len(rw.violations) > 0 {
-		go showRedAlert(rw.violations)
+	if rw.banner != nil {
+		_ = rw.banner.SetText("🧪 模拟异常验证（仅内存数据；点击“重新扫描”恢复真实磁盘）\n" + alertBannerText(rw.disks, rw.violations))
 	}
 }
 
