@@ -125,6 +125,9 @@ func TestATAAttrNameForModelCrystalDiskInfoAliases(t *testing.T) {
 	if got := ATAAttrNameForModel("INTEL SSDSC2BA200G3", 0xF3); got != "NAND_Writes" {
 		t.Fatalf("Intel F3 alias = %q", got)
 	}
+	if got := ATAAttrNameForModel("Seagate ZA240CV10001", 0xEA); got != "NAND_Writes_SLC" {
+		t.Fatalf("Seagate EA alias = %q", got)
+	}
 	if got := ATAAttrNameForModel("Intel SSD DC S3500", 0xF3); got == "Temperature_Celsius" {
 		t.Fatalf("Intel F3 must not be interpreted as temperature")
 	}

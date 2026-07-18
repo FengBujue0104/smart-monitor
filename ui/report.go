@@ -400,6 +400,10 @@ func attrRawStrForModel(model string, a smart.Attr) string {
 			// CrystalDiskInfo converts Intel F1 host writes and F3 NAND writes
 			// from 32 MB units to GB. F3 temperature is YMTC-only.
 			return fmt.Sprintf("%d GB (%d × 32 MB)", a.Raw/32, a.Raw)
+		case strings.Contains(m, "seagate") && (a.ID == 0xE9 || a.ID == 0xEA || a.ID == 0xF1 || a.ID == 0xF2):
+			// CrystalDiskInfo's Seagate branch uses direct GB counters for
+			// these host/NAND write and host read attributes.
+			return fmt.Sprintf("%d GB", a.Raw)
 		case strings.Contains(m, "kioxia") && a.ID == 0xF1:
 			// CrystalDiskInfo's IsSsdKioxia selects 32 MB host I/O units;
 			// its F1 handling converts the raw counter to GB by dividing by 32.

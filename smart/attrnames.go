@@ -121,8 +121,17 @@ func ATAAttrNameForModel(model string, id int) string {
 			return "Total_LBAs_Read"
 		}
 	case strings.Contains(m, "seagate"):
-		if id == 0xBC {
+		switch id {
+		case 0xBC:
 			return "Command_Timeout"
+		case 0xE9:
+			return "NAND_Writes"
+		case 0xEA:
+			return "NAND_Writes_SLC"
+		case 0xF1:
+			return "Host_Writes_GB"
+		case 0xF2:
+			return "Host_Reads_GB"
 		}
 	}
 	return name

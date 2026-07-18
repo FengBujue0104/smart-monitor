@@ -65,6 +65,9 @@ func TestAttrDisplaySeparatesRawAndNormalizedValues(t *testing.T) {
 	if got := attrRawStrForModel("INTEL SSDSC2BA200G3", smart.Attr{ID: 0xF3, Raw: 32000, Kind: "ata"}); got != "1000 GB (32000 × 32 MB)" {
 		t.Fatalf("unexpected Intel NAND writes display: %q", got)
 	}
+	if got := attrRawStrForModel("Seagate ZA240CV10001", smart.Attr{ID: 0xF1, Raw: 12345, Kind: "ata"}); got != "12345 GB" {
+		t.Fatalf("unexpected Seagate host writes display: %q", got)
+	}
 	if got := attrRawStrForModel("ZHITAI TiPlus5000", smart.Attr{ID: 0xF3, Raw: 0x46302A, Kind: "ata"}); got != "42°C (min 48°C, max 70°C)" {
 		t.Fatalf("unexpected YMTC F3 temperature display: %q", got)
 	}
