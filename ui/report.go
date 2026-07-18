@@ -348,6 +348,11 @@ func attrRawStrForModel(model string, a smart.Attr) string {
 			}
 			return fmt.Sprintf("%d°C (raw %d)", current, a.Raw)
 		}
+		if smart.IsYMTCSATAModel(model) && (a.ID == 0xF1 || a.ID == 0xF2) {
+			// CrystalDiskInfo's IsSsdYmtc selects 512-byte host I/O units.
+			// Convert sectors to GiB, retaining the raw unit for traceability.
+			return fmt.Sprintf("%.2f GiB (%d × 512 B)", float64(a.Raw)/(2*1024*1024), a.Raw)
+		}
 		m := strings.ToLower(model)
 		switch {
 		case strings.Contains(m, "kioxia") && a.ID == 0xF1:

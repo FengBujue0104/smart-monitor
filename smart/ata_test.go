@@ -113,6 +113,9 @@ func TestATAAttrNameForModelCrystalDiskInfoAliases(t *testing.T) {
 	if got := ATAAttrNameForModel("ZHITAI TiPlus5000", 0xF3); got != "Temperature_Celsius" {
 		t.Fatalf("ZHITAI F3 alias = %q", got)
 	}
+	if got := ATAAttrNameForModel("ZHITAI TiPlus5000", 0xF1); got != "Host_Writes" {
+		t.Fatalf("ZHITAI F1 alias = %q", got)
+	}
 	if got := ATAAttrNameForModel("Intel SSD DC S3500", 0xF3); got == "Temperature_Celsius" {
 		t.Fatalf("Intel F3 must not be interpreted as temperature")
 	}
@@ -132,5 +135,8 @@ func TestATATemperatureAttributeForModelLimitsF3ToYMTC(t *testing.T) {
 		if got := ATATemperatureAttributeForModel(test.model, test.id); got != test.want {
 			t.Fatalf("temperature attribute (%q, 0x%02X) = %v, want %v", test.model, test.id, got, test.want)
 		}
+	}
+	if !IsYMTCSATAModel("ZHITAI TiPlus5000") || !IsYMTCSATAModel("致态 TiPlus5000") || IsYMTCSATAModel("Intel SSD DC S3500") {
+		t.Fatal("unexpected YMTC model identification")
 	}
 }
