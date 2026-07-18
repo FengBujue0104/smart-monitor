@@ -1,5 +1,6 @@
 # 构建产物
 smonitor.exe
+smonitor.exe~
 rsrc.syso
 
 # 日志 / 截图
