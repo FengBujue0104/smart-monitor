@@ -74,6 +74,11 @@ func RunReport(disks []smart.Disk, violations []health.Violation) error {
 						OnClicked: func() { rw.copyReport() },
 					},
 					PushButton{
+						Text:      "模拟异常验证",
+						MinSize:   Size{Width: 120, Height: 30},
+						OnClicked: func() { rw.simulateFailures() },
+					},
+					PushButton{
 						Text:      "重新扫描",
 						MinSize:   Size{Width: 100, Height: 30},
 						OnClicked: func() { rw.rescan() },
@@ -514,18 +519,37 @@ func (rw *ReportWin) rescan() {
 		walk.MsgBox(rw, "扫描失败", err.Error(), walk.MsgBoxIconError)
 		return
 	}
+	if err := rw.setReportData(disks); err != nil {
+		walk.MsgBox(rw, "刷新失败", err.Error(), walk.MsgBoxIconError)
+	}
+}
+
+func (rw *ReportWin) simulateFailures() {
+	if err := rw.setReportData(SimulatedFailureDisks()); err != nil {
+		walk.MsgBox(rw, "模拟失败", err.Error(), walk.MsgBoxIconError)
+		return
+	}
+	walk.MsgBox(rw, "模拟异常已加载", "已载入内存中的 ATA/NVMe 异常场景。\n可检查红黄表格、告警窗口和“复制异常条目”。\n点击“重新扫描”即可恢复真实磁盘数据。", walk.MsgBoxIconInformation)
+	if len(rw.violations) > 0 {
+		go showRedAlert(rw.violations)
+	}
+}
+
+func (rw *ReportWin) setReportData(disks []smart.Disk) error {
 	rw.disks = disks
 	rw.violations = health.Evaluate(disks)
 	if rw.banner != nil {
-		_ = rw.banner.SetText(alertBannerText(disks, rw.violations))
+		if err := rw.banner.SetText(alertBannerText(disks, rw.violations)); err != nil {
+			return err
+		}
 		rw.banner.SetTextColor(alertBannerColor(disks, rw.violations))
 	}
 	if rw.tv != nil {
 		if err := rw.tv.SetModel(&reportModel{disks: disks, violations: rw.violations}); err != nil {
-			walk.MsgBox(rw, "刷新失败", err.Error(), walk.MsgBoxIconError)
-			return
+			return err
 		}
 	}
+	return nil
 }
 
 func hostName() string {
