@@ -110,7 +110,7 @@ func TestParseNVMeHealthLog(t *testing.T) {
 	for _, a := range attrs {
 		values[a.ID] = a.Raw
 	}
-	if values[NVMeTemperature] != 300 || values[NVMeTemperatureSensor1] != 310 || values[NVMePowerCycles] != 12 ||
+	if values[NVMeTemperature] != 300 || values[NVMePowerCycles] != 12 ||
 		values[NVMePowerOnHours] != 34 || values[NVMeMediaErrors] != 2 ||
 		values[NVMeWarningTempTime] != 9 || values[NVMeReadOnly] != 1 || values[NVMeEnduranceGroupCriticalWarning] != 0x04 {
 		t.Fatalf("unexpected NVMe attributes: %+v", values)
@@ -132,11 +132,11 @@ func TestParseNVMeHealthLogAllowsPartialTemperatureSensorArray(t *testing.T) {
 	for _, a := range attrs {
 		values[a.ID] = a.Raw
 	}
-	if values[NVMeTemperature] != 300 || values[NVMeTemperatureSensor1] != 310 {
+	if values[NVMeTemperature] != 300 {
 		t.Fatalf("unexpected attributes from partial sensor array: %+v", values)
 	}
-	if _, ok := values[NVMeTemperatureSensor2]; ok {
-		t.Fatalf("unexpected second sensor from truncated data: %+v", values)
+	if _, ok := values[NVMeTemperatureSensor1]; ok {
+		t.Fatalf("optional sensor must not become a synthetic SMART row: %+v", values)
 	}
 }
 

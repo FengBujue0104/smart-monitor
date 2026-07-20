@@ -233,21 +233,9 @@ func parseNVMeHealthLog(data []byte) []Attr {
 	attrs = append(attrs, Attr{ID: NVMeErrorInfoEntries, Name: "Error_Info_Log_Entries", Raw: errorInfoEntries, RawHigh: errorInfoEntriesHigh, Kind: "nvme"})
 	attrs = append(attrs, Attr{ID: NVMeWarningTempTime, Name: "Warning_Temperature_Time", Raw: warningTempTime, Kind: "nvme"})
 	attrs = append(attrs, Attr{ID: NVMeCriticalTempTime, Name: "Critical_Temperature_Time", Raw: criticalTempTime, Kind: "nvme"})
-	for i := 0; i < 8; i++ {
-		off := 0xC8 + i*2
-		if off+2 > len(data) {
-			break
-		}
-		temp := binary.LittleEndian.Uint16(data[off : off+2])
-		if temp == 0 {
-			continue
-		}
-		attrs = append(attrs, Attr{
-			ID:   NVMeTemperatureSensor1 + i,
-			Name: fmt.Sprintf("Temperature_Sensor_%d_Kelvin", i+1),
-			Raw:  uint64(temp), Kind: "nvme",
-		})
-	}
+	// Temperature Sensor 1..8 are optional vendor-defined locations. Keep
+	// health reporting aligned with CrystalDiskInfo: expose the standard
+	// Composite Temperature and Critical Warning, not synthetic 0x100+ rows.
 
 	// 只读模式（CriticalWarning bit 3）
 	if cw&(1<<3) != 0 {
