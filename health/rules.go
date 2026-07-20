@@ -305,11 +305,10 @@ func evaluateNVMe(d smart.Disk) []Violation {
 				add(a, Critical, "ReadOnly", "ReadWrite")
 			}
 		default:
-			if a.ID >= smart.NVMeTemperatureSensor1 && a.ID <= smart.NVMeTemperatureSensor8 {
-				// Controller WCTEMP/CCTEMP apply to the composite temperature;
-				// individual sensors retain the documented generic fallback.
-				addNVMeTemperatureViolation(add, a, 0, 0)
-			}
+			// Per-sensor temperatures are vendor-defined locations (controller,
+			// NAND, PCB, etc.) and NVMe exposes no universal threshold for each.
+			// Display them, but base alerts on Composite Temperature and the
+			// device's Critical Warning bit to avoid false alarms.
 		}
 	}
 	// 单独处理 AvailableSpare < Threshold 的比较
