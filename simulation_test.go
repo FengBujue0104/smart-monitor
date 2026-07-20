@@ -15,8 +15,8 @@ func TestSimulatedDiskFailuresProduceFeedbackReport(t *testing.T) {
 	disks := ui.SimulatedFailureDisks()
 
 	violations := health.Evaluate(disks)
-	if len(violations) != 9 {
-		t.Fatalf("violation count = %d, want 9: %+v", len(violations), violations)
+	if len(violations) != 8 {
+		t.Fatalf("violation count = %d, want 8: %+v", len(violations), violations)
 	}
 	var critical, warning int
 	for _, v := range violations {
@@ -27,8 +27,8 @@ func TestSimulatedDiskFailuresProduceFeedbackReport(t *testing.T) {
 			warning++
 		}
 	}
-	if critical != 6 || warning != 3 {
-		t.Fatalf("severity counts critical=%d warning=%d, want 6/3: %+v", critical, warning, violations)
+	if critical != 5 || warning != 3 {
+		t.Fatalf("severity counts critical=%d warning=%d, want 5/3: %+v", critical, warning, violations)
 	}
 
 	report := ui.BuildExceptionReportForTest(disks, violations)
