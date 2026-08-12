@@ -83,10 +83,16 @@ func RunReportWithScan(discover func() ([]smart.Disk, error)) error {
 // report and the asynchronous scan entry points.
 func createReportWindow(rw *ReportWin, model *reportModel, status string) (*ReportWin, error) {
 	bannerText, bannerColor := reportBanner(rw.disks, rw.violations, status)
+	// 初始/错误提示阶段（status 非空）标题保持中性；数据就绪后由
+	// setReportData 切换为健康状态标题。
+	initialTitle := "S.M.A.R.T 健康检查报告"
+	if status == "" {
+		initialTitle = reportTitle(rw.violations)
+	}
 
 	err := MainWindow{
 		AssignTo: &rw.MainWindow,
-		Title:    "S.M.A.R.T 健康检查报告",
+		Title:    initialTitle,
 		// 11 列总宽约 1270px，默认窗口放大到能一屏容纳，避免用户横向滚动。
 		MinSize: Size{Width: 900, Height: 560},
 		Size:    Size{Width: 1320, Height: 700},
