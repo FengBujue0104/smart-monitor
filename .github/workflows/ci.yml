@@ -30,3 +30,8 @@ jobs:
       # （若仓库根目录残留 rsrc.syso，build.bat 已自动清理。）
       - name: Test
         run: go test ./... -count=1
+
+      # race 检测覆盖纯逻辑包（health/smart/ui 无 GUI 消息循环，可安全运行）。
+      # 主包含 walk GUI 初始化，不在 race 范围内。
+      - name: Race
+        run: go test -race -count=1 ./health/ ./smart/ ./ui/
