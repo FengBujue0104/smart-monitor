@@ -244,11 +244,13 @@ func TestAlertBannerShowsSMARTReadFailureReason(t *testing.T) {
 }
 
 func TestReportBannerShowsStartupStatusWithoutDialog(t *testing.T) {
+	// status 非空时只显示状态文本，不附加“未发现支持 SMART”等会在扫描中
+	// 误导用户的噪音行；颜色用橙色提示而非红色告警。
 	text, color := reportBanner(nil, nil, "扫描失败：访问被拒绝")
-	if !strings.Contains(text, "扫描失败：访问被拒绝") || !strings.Contains(text, "未发现支持 SMART") {
+	if text != "扫描失败：访问被拒绝" || strings.Contains(text, "未发现支持 SMART") {
 		t.Fatalf("unexpected startup banner: %q", text)
 	}
-	if color != walk.RGB(0xB0, 0x20, 0x20) {
+	if color != walk.RGB(0xB0, 0x60, 0x00) {
 		t.Fatalf("unexpected startup status color: %#v", color)
 	}
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -9,7 +8,6 @@ import (
 
 	"github.com/lxn/walk"
 	"golang.org/x/sys/windows"
-	"smonitor/health"
 	"smonitor/smart"
 	"smonitor/ui"
 )
@@ -41,33 +39,23 @@ func main() {
 		log.SetOutput(logFile)
 	}
 
-	// 每次扫描均优先使用 IOCTL，并按同一套规则合并 WMI 回退；这让首次
-	// 扫描和 GUI 的“重新扫描”在 USB/RAID 控制器上的结果保持一致。
-	disks, err := smart.DiscoverWithFallback()
-	if err != nil {
-		if uiErr := ui.RunReportWithStatus(nil, nil, fmt.Sprintf("❌ 扫描失败：枚举磁盘失败: %v", err)); uiErr != nil {
-			log.Printf("UI error: %v", uiErr)
-		}
-		return
-	}
-	if len(disks) == 0 {
-		if err := ui.RunReportWithStatus(nil, nil, "⚠ 未找到任何物理磁盘。"); err != nil {
-			log.Printf("UI error: %v", err)
-		}
-		return
-	}
-
-	violations := health.Evaluate(disks)
-	if err := ui.RunReport(disks, violations); err != nil {
+	// 立即显示窗口并后台扫描：USB/RAID 探测可能耗时数秒，同步扫描会让
+	// 双击后的窗口长时间不出现。扫描失败/无磁盘也由窗口横幅呈现，无需
+	// 启动前的阻塞分支。
+	if err := ui.RunReportWithScan(smart.DiscoverWithFallback); err != nil {
 		log.Printf("UI error: %v", err)
 		os.Exit(3)
 	}
 }
 
-// openLogFile 优先在当前目录创建日志；不可写时回退到系统临时目录。
+// openLogFile 优先在 exe 所在目录创建日志；不可写时回退到系统临时目录。
 // 返回的 *os.File 为 nil 时调用方应跳过日志输出（静默降级）。
 func openLogFile() (*os.File, error) {
-	f, err := os.OpenFile("smonitor.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	dir := "."
+	if exe, err := os.Executable(); err == nil {
+		dir = filepath.Dir(exe)
+	}
+	f, err := os.OpenFile(filepath.Join(dir, "smonitor.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err == nil {
 		return f, nil
 	}

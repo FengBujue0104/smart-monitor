@@ -57,7 +57,33 @@ func RunReport(disks []smart.Disk, violations []health.Violation) error {
 func RunReportWithStatus(disks []smart.Disk, violations []health.Violation, status string) error {
 	rw := &ReportWin{disks: disks, violations: violations}
 	model := &reportModel{disks: disks, violations: violations}
-	bannerText, bannerColor := reportBanner(disks, violations, status)
+	if _, err := createReportWindow(rw, model, status); err != nil {
+		return err
+	}
+	rw.Run()
+	return nil
+}
+
+// RunReportWithScan shows the window immediately with a "scanning" banner and
+// runs the disk scan in the background, so the UI never sits frozen for the
+// few seconds a USB/RAID probe can take. The scan result fills the report via
+// the same rescan path (first scan is just the initial rescan).
+func RunReportWithScan(discover func() ([]smart.Disk, error)) error {
+	rw := &ReportWin{}
+	model := &reportModel{}
+	if _, err := createReportWindow(rw, model, "正在扫描磁盘，请稍候…"); err != nil {
+		return err
+	}
+	rw.rescanWith(discover)
+	rw.Run()
+	return nil
+}
+
+// createReportWindow builds the main report window with the given banner
+// status and returns the populated ReportWin. Shared by the synchronous
+// report and the asynchronous scan entry points.
+func createReportWindow(rw *ReportWin, model *reportModel, status string) (*ReportWin, error) {
+	bannerText, bannerColor := reportBanner(rw.disks, rw.violations, status)
 
 	err := MainWindow{
 		AssignTo: &rw.MainWindow,
@@ -131,19 +157,17 @@ func RunReportWithStatus(disks []smart.Disk, violations []health.Violation, stat
 	}.Create()
 
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	rw.Run()
-	return nil
+	return rw, nil
 }
 
 func reportBanner(disks []smart.Disk, violations []health.Violation, status string) (string, walk.Color) {
-	text, color := alertBannerText(disks, violations), alertBannerColor(disks, violations)
 	if status != "" {
-		return status + "\n" + text, walk.RGB(0xB0, 0x20, 0x20)
+		// 初始/错误提示：只显示状态文本，不附加“未发现磁盘”等会误导的噪音行。
+		return status, walk.RGB(0xB0, 0x60, 0x00)
 	}
-	return text, color
+	return alertBannerText(disks, violations), alertBannerColor(disks, violations)
 }
 
 // stampText 生成“检测时间”行。每次扫描（含重新扫描）都应刷新，
@@ -628,6 +652,13 @@ func (rw *ReportWin) copyReport() {
 }
 
 func (rw *ReportWin) rescan() {
+	rw.rescanWith(smart.DiscoverWithFallback)
+}
+
+// rescanWith runs a disk scan in the background and refreshes the report.
+// It is shared by the "重新扫描" button and the initial startup scan, so a
+// duplicate invocation is rejected by the rescanning flag in both cases.
+func (rw *ReportWin) rescanWith(discover func() ([]smart.Disk, error)) {
 	if rw.rescanning {
 		return
 	}
@@ -635,14 +666,12 @@ func (rw *ReportWin) rescan() {
 	if rw.rescanBtn != nil {
 		rw.rescanBtn.SetEnabled(false)
 	}
-	rw.showStatus("正在重新扫描磁盘，请稍候…", walk.RGB(0xB0, 0x60, 0x00))
+	rw.showStatus("正在扫描磁盘，请稍候…", walk.RGB(0xB0, 0x60, 0x00))
 
 	// SMART IOCTL and WMI probing can take noticeable time on USB/RAID
 	// controllers. Keep that work outside Walk's UI thread, then marshal only
 	// the model replacement back to the window.
-	// Match startup behavior: native IOCTL first, then WMI fallback for
-	// controllers such as USB/SCSI bridges and some RAID stacks.
-	result := discoverAsync(smart.DiscoverWithFallback)
+	result := discoverAsync(discover)
 	go func() {
 		outcome := <-result
 		// 兜底：discoverAsync 已把扫描 goroutine 的 panic 转成 error；
@@ -663,12 +692,15 @@ func (rw *ReportWin) rescan() {
 			if rw.rescanBtn != nil {
 				rw.rescanBtn.SetEnabled(true)
 			}
-			if outcome.err != nil {
+			switch {
+			case outcome.err != nil:
 				rw.showStatus("扫描失败："+outcome.err.Error(), walk.RGB(0xB0, 0x20, 0x20))
-				return
-			}
-			if err := rw.setReportData(outcome.disks); err != nil {
-				rw.showStatus("刷新失败："+err.Error(), walk.RGB(0xB0, 0x20, 0x20))
+			case len(outcome.disks) == 0:
+				rw.showStatus("⚠ 未找到任何物理磁盘。", walk.RGB(0xB0, 0x60, 0x00))
+			default:
+				if err := rw.setReportData(outcome.disks); err != nil {
+					rw.showStatus("刷新失败："+err.Error(), walk.RGB(0xB0, 0x20, 0x20))
+				}
 			}
 		})
 	}()
@@ -683,11 +715,17 @@ func (rw *ReportWin) simulateFailures() {
 }
 
 // showStatus 将操作结果直接写入主窗口横幅，避免模态对话框阻塞界面。
+// 首次扫描完成前 rw.disks 为空，此时不拼接告警行（否则会显示误导性的
+// “未发现支持 SMART 的物理磁盘”）。
 func (rw *ReportWin) showStatus(message string, color walk.Color) {
 	if rw.banner == nil {
 		return
 	}
-	_ = rw.banner.SetText(message + "\n" + alertBannerText(rw.disks, rw.violations))
+	text := message
+	if rw.disks != nil {
+		text += "\n" + alertBannerText(rw.disks, rw.violations)
+	}
+	_ = rw.banner.SetText(text)
 	rw.banner.SetTextColor(color)
 }
 

@@ -6,7 +6,7 @@ Windows 10/11 兼容、单 .exe 分发。读取物理硬盘的 S.M.A.R.T 属性�
 
 1. 拿到 `smonitor.exe`（双击）
 2. 由于要直接访问 `\\.\PhysicalDriveN`，会弹出 UAC 请求管理员权限 → **允许**
-3. 主窗口显示所有 SMART 属性与状态；顶部横幅列出异常项；点击「复制异常条目」可直接粘贴到反馈表格。点击「模拟异常验证」可在不操作真实磁盘的前提下检查异常显示、横幅和复制格式。
+3. 主窗口立即显示并开始后台扫描（USB/RAID 探测可能耗时数秒，窗口不会卡住）；完成后列出所有 SMART 属性与状态，顶部横幅列出异常项；点击「复制异常条目」可直接粘贴到反馈表格。点击「模拟异常验证」可在不操作真实磁盘的前提下检查异常显示、横幅和复制格式。
 
 ## 构建
 
@@ -33,6 +33,13 @@ Windows 10/11 兼容、单 .exe 分发。读取物理硬盘的 S.M.A.R.T 属性�
 签名使用 SHA256 + RFC 3161 时间戳（`/fd SHA256 /tr http://timestamp.digicert.com /td SHA256`）。需要 Windows SDK 的 `signtool.exe`（Windows 10 SDK 自带）。
 
 > 注：签名只消除 SmartScreen"未知发布者"提示。要让 Windows 完全信任，证书须由受信任的公共 CA（如 DigiCert、GlobalSign、Let's Encrypt 不支持代码签名）签发；自签名或测试证书仅用于内部验证。
+
+### 测试（需要管理员权限）
+
+`rsrc/app.manifest` 声明 `requireAdministrator`，所有可执行产物（含测试二进制）都会触发 UAC 提权。因此在普通终端里 `go test .`（主包）会报 `The requested operation requires elevation`：
+
+- 在**管理员** PowerShell / 终端中运行 `go test ./...`（或 `go test -run TestSimulatedDiskFailuresProduceFeedbackReport -v .`）；
+- `./health/ ./smart/ ./ui/` 三个子包不读真实磁盘，任意权限下都能跑。
 
 ### 日志文件
 
