@@ -15,8 +15,8 @@ func TestSimulatedDiskFailuresProduceFeedbackReport(t *testing.T) {
 	disks := ui.SimulatedFailureDisks()
 
 	violations := health.Evaluate(disks)
-	if len(violations) != 8 {
-		t.Fatalf("violation count = %d, want 8: %+v", len(violations), violations)
+	if len(violations) != 9 {
+		t.Fatalf("violation count = %d, want 9: %+v", len(violations), violations)
 	}
 	var critical, warning int
 	for _, v := range violations {
@@ -28,9 +28,10 @@ func TestSimulatedDiskFailuresProduceFeedbackReport(t *testing.T) {
 		}
 	}
 	// 剩余寿命规则为“低于 50% 即红色告警”：E6(5%) 与 NVMe PercentUsed(80%)
-	// 均为 critical，只有 BC(Command_Timeout) 是 warning。
-	if critical != 7 || warning != 1 {
-		t.Fatalf("severity counts critical=%d warning=%d, want 7/1: %+v", critical, warning, violations)
+	// 均为 critical，复合温度 334K(61°C) 也是 critical，只有 BC(Command_Timeout)
+	// 是 warning。
+	if critical != 8 || warning != 1 {
+		t.Fatalf("severity counts critical=%d warning=%d, want 8/1: %+v", critical, warning, violations)
 	}
 
 	report := ui.BuildExceptionReportForTest(disks, violations)

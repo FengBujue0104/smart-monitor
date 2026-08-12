@@ -28,6 +28,7 @@ func SimulatedFailureDisks() []smart.Disk {
 			Attrs: []smart.Attr{
 				{ID: smart.NVMeCriticalWarning, Name: "Critical_Warning", Raw: 0x02, Kind: "nvme"},
 				{ID: smart.NVMeMediaErrors, Name: "Media_Data_Integrity_Errors", Raw: 1, Kind: "nvme"},
+				{ID: smart.NVMeTemperature, Name: "Temperature_Kelvin", Raw: 334, Kind: "nvme"}, // 61°C，超过 60°C 回退阈值
 				{ID: smart.NVMeTemperatureSensor1, Name: "Temperature_Sensor_1_Kelvin", Raw: 334, Kind: "nvme"},
 				{ID: smart.NVMePercentUsed, Name: "Percentage_Used", Raw: 80, Kind: "nvme"},
 			},
