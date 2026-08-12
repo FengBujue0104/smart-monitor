@@ -1,8 +1,6 @@
 package smart
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
 	"strings"
 	"unicode"
@@ -313,7 +311,3 @@ func cleanWMIString(s string) string {
 	s = strings.ReplaceAll(s, "\x00", "")
 	return strings.TrimSpace(s)
 }
-
-// 小工具：binary 已用
-var _ = binary.LittleEndian
-var _ = bytes.TrimSpace
