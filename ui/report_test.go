@@ -142,6 +142,28 @@ func TestAttrRawStrForModelShowsCorsairVoyagerGTX1MBCounter(t *testing.T) {
 	}
 }
 
+// KIOXIA F1 主机写入按 32 MB 单位显示；WD Blue SA510 的 F1 直接以 GB 显示。
+func TestAttrRawStrForModelShowsKioxiaAndWDUnits(t *testing.T) {
+	if got := attrRawStrForModel("KIOXIA-EXCERIA SATA SSD", smart.Attr{ID: 0xF1, Raw: 1024, Kind: "ata"}); got != "32 GB (1024 × 32 MB)" {
+		t.Fatalf("KIOXIA F1 display = %q", got)
+	}
+	if got := attrRawStrForModel("WD Blue SA510 2.5 500GB SSD", smart.Attr{ID: 0xF1, Raw: 12153, Kind: "ata"}); got != "12153 GB" {
+		t.Fatalf("WD SA510 F1 display = %q", got)
+	}
+}
+
+// 温度属性展开当前/最低/最高（raw 低三字节），未知型号的普通计数保持原样。
+func TestAttrRawStrForModelShowsTemperatureAndFallsBackToRaw(t *testing.T) {
+	// C2 raw 低三字节：byte0=当前(0x23=35)、byte1=最低(0x00)、byte2=最高(0x14=20)
+	if got := attrRawStrForModel("Generic HDD", smart.Attr{ID: 0xC2, Raw: 0x002800140023, Kind: "ata"}); got != "35°C (min 0°C, max 20°C)" {
+		t.Fatalf("C2 min/max display = %q", got)
+	}
+	// 未知型号的 F1 不做单位换算，显示原始值
+	if got := attrRawStrForModel("Generic SSD", smart.Attr{ID: 0xF1, Raw: 999, Kind: "ata"}); got != "999" {
+		t.Fatalf("unknown-model F1 display = %q", got)
+	}
+}
+
 func TestDiskSummaryShowsOverallSMARTStatusWhenKnown(t *testing.T) {
 	d := smart.Disk{Model: "Test HDD", SmartStatusKnown: true, SmartStatusPassed: false, Attrs: []smart.Attr{{ID: 1}}}
 	if got := diskSummary(d); !strings.Contains(got, "SMART失败") || smartStatusText(d) != "失败" {

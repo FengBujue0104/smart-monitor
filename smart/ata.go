@@ -461,12 +461,16 @@ func parseSMARTThresholds(data []byte) map[int]int {
 	return m
 }
 
-// swapUTF16Bytes 对每 2 字节做 byte-swap（ATA IDENTIFY 双字节反序）
+// swapUTF16Bytes 对每 2 字节做 byte-swap（ATA IDENTIFY 双字节反序）。
+// 奇数长度的末尾字节原样保留（IDENTIFY 字段恒为偶数长度，仅作防御）。
 func swapUTF16Bytes(b []byte) []byte {
 	out := make([]byte, len(b))
 	for i := 0; i+1 < len(b); i += 2 {
 		out[i] = b[i+1]
 		out[i+1] = b[i]
+	}
+	if len(b)%2 != 0 && len(b) > 0 {
+		out[len(b)-1] = b[len(b)-1]
 	}
 	return out
 }
