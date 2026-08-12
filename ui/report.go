@@ -24,6 +24,7 @@ type ReportWin struct {
 	simBtn     *walk.PushButton
 	rescanBtn  *walk.PushButton
 	rescanning bool
+	closed     bool // 窗口已关闭：扫描完成回调不得再触碰已销毁的控件
 }
 
 type discoveryResult struct {
@@ -159,6 +160,11 @@ func createReportWindow(rw *ReportWin, model *reportModel, status string) (*Repo
 	if err != nil {
 		return nil, err
 	}
+	// 记录窗口关闭：扫描完成回调（通过 Synchronize 在 UI 线程执行）若在
+	// 窗口销毁后触碰控件会导致崩溃，必须放弃刷新。
+	rw.Closing().Attach(func(_ *bool, _ walk.CloseReason) {
+		rw.closed = true
+	})
 	return rw, nil
 }
 
@@ -701,6 +707,9 @@ func (rw *ReportWin) rescanWith(discover func() ([]smart.Disk, error)) {
 		defer func() {
 			if r := recover(); r != nil {
 				rw.Synchronize(func() {
+					if rw.closed {
+						return
+					}
 					rw.rescanning = false
 					rw.setActionsEnabled(true)
 					rw.showStatus("扫描异常："+fmt.Sprintf("%v", r), walk.RGB(0xB0, 0x20, 0x20))
@@ -708,6 +717,9 @@ func (rw *ReportWin) rescanWith(discover func() ([]smart.Disk, error)) {
 			}
 		}()
 		rw.Synchronize(func() {
+			if rw.closed {
+				return
+			}
 			rw.rescanning = false
 			rw.setActionsEnabled(true)
 			switch {
