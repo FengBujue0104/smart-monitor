@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        go: ['1.26.x']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      # 主包测试只操作内存模拟数据，不读真实磁盘，普通权限即可运行。
+      # （若仓库根目录残留 rsrc.syso，build.bat 已自动清理。）
+      - name: Test
+        run: go test ./... -count=1
