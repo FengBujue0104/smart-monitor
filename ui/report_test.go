@@ -244,6 +244,30 @@ func TestReportModelShowsDiskLevelSMARTDiagnostics(t *testing.T) {
 	}
 }
 
+func TestReportTitleReflectsHealthState(t *testing.T) {
+	mk := func(sev string, n int) []health.Violation {
+		var vs []health.Violation
+		for i := 0; i < n; i++ {
+			vs = append(vs, health.Violation{Severity: sev})
+		}
+		return vs
+	}
+	if got := reportTitle(nil); !strings.Contains(got, "✅") {
+		t.Fatalf("healthy title = %q", got)
+	}
+	if got := reportTitle(mk(health.Warning, 2)); !strings.Contains(got, "⚠️") || !strings.Contains(got, "2 项警告") {
+		t.Fatalf("warning title = %q", got)
+	}
+	if got := reportTitle(mk(health.Critical, 1)); !strings.Contains(got, "❌") || !strings.Contains(got, "1 项严重告警") {
+		t.Fatalf("critical title = %q", got)
+	}
+	// 混合时优先严重告警
+	both := append(mk(health.Warning, 3), mk(health.Critical, 2)...)
+	if got := reportTitle(both); !strings.Contains(got, "2 项严重告警") {
+		t.Fatalf("mixed title = %q", got)
+	}
+}
+
 func TestAlertBannerTextRepresentsCurrentScanState(t *testing.T) {
 	if got := alertBannerText([]smart.Disk{{Kind: smart.KindATA, Attrs: []smart.Attr{{ID: 1}}}}, nil); !strings.Contains(got, "安全范围") {
 		t.Fatalf("unexpected safe banner: %q", got)

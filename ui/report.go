@@ -24,7 +24,8 @@ type ReportWin struct {
 	simBtn     *walk.PushButton
 	rescanBtn  *walk.PushButton
 	rescanning bool
-	closed     bool // 窗口已关闭：扫描完成回调不得再触碰已销毁的控件
+	closed     bool     // 窗口已关闭：扫描完成回调不得再触碰已销毁的控件
+	lastTitle  string   // 上次设置的标题，用于“新出现严重告警”时蜂鸣一次
 }
 
 type discoveryResult struct {
@@ -769,6 +770,26 @@ func (rw *ReportWin) setActionsEnabled(enabled bool) {
 	}
 }
 
+// reportTitle 生成随健康状态变化的窗口标题，让任务栏也能看出是否有严重告警。
+func reportTitle(vs []health.Violation) string {
+	critical, warnings := 0, 0
+	for _, v := range vs {
+		if v.Severity == health.Critical {
+			critical++
+		} else {
+			warnings++
+		}
+	}
+	switch {
+	case critical > 0:
+		return fmt.Sprintf("❌ S.M.A.R.T 健康检查报告 — %d 项严重告警", critical)
+	case warnings > 0:
+		return fmt.Sprintf("⚠️ S.M.A.R.T 健康检查报告 — %d 项警告", warnings)
+	default:
+		return "✅ S.M.A.R.T 健康检查报告"
+	}
+}
+
 func (rw *ReportWin) setReportData(disks []smart.Disk) error {
 	rw.disks = disks
 	rw.violations = health.Evaluate(disks)
@@ -788,6 +809,17 @@ func (rw *ReportWin) setReportData(disks []smart.Disk) error {
 			return err
 		}
 	}
+	// 标题随健康状态更新；状态从“无严重”变为“有严重”时蜂鸣一次提醒。
+	title := reportTitle(rw.violations)
+	if rw.MainWindow != nil {
+		if err := rw.SetTitle(title); err != nil {
+			return err
+		}
+	}
+	if strings.Contains(title, "❌") && !strings.Contains(rw.lastTitle, "❌") {
+		alertBeep()
+	}
+	rw.lastTitle = title
 	return nil
 }
 
