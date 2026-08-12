@@ -278,20 +278,6 @@ func parseNVMeCompositeTemperatureThresholds(data []byte) (warningK, criticalK u
 	return uint64(binary.LittleEndian.Uint16(data[266:268])), uint64(binary.LittleEndian.Uint16(data[268:270]))
 }
 
-// ReadNVMeHealth 读取 NVMe 健康日志并返回统一 Attr 列表。
-func ReadNVMeHealth(h windows.Handle) ([]Attr, error) {
-	attrs, _, _, err := ReadNVMeHealthWithThresholds(h)
-	return attrs, err
-}
-
-// ReadNVMeHealthWithThresholds reads the standard health log plus optional
-// controller-declared composite-temperature thresholds. Identify failures do
-// not discard otherwise valid health data.
-func ReadNVMeHealthWithThresholds(h windows.Handle) ([]Attr, uint64, uint64, error) {
-	attrs, warningK, criticalK, _, err := ReadNVMeHealthWithThresholdsAndTransport(h)
-	return attrs, warningK, criticalK, err
-}
-
 // ReadNVMeHealthWithThresholdsAndTransport reads standard NVMe health data
 // through the protocol-command path first, then the standard storage-property
 // query path. The latter helps controllers that expose the log through Windows

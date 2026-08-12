@@ -253,12 +253,6 @@ func ReadIdentify(h windows.Handle, driveNum byte) (model, serial, firmware stri
 	return model, serial, firmware, nil
 }
 
-// ReadSMARTData 读取 SMART 属性表。
-func ReadSMARTData(h windows.Handle, driveNum byte) ([]Attr, bool, error) {
-	attrs, ok, _, err := ReadSMARTDataDetailed(h, driveNum)
-	return attrs, ok, err
-}
-
 func ReadSMARTDataDetailed(h windows.Handle, driveNum byte) ([]Attr, bool, bool, error) {
 	data, err := issueSmartCommand(h, ATA_CMD_SMART, SMART_READ_DATA, driveNum)
 	if err != nil {
@@ -409,18 +403,6 @@ func smartTableBase(data []byte) int {
 		return 2
 	}
 	return 0
-}
-
-// ReadSMARTThresholds 读取属性阈值页。
-func ReadSMARTThresholds(h windows.Handle, driveNum byte) (map[int]int, error) {
-	thresholds, checksumValid, err := ReadSMARTThresholdsDetailed(h, driveNum)
-	if err != nil {
-		return nil, err
-	}
-	if !checksumValid {
-		return nil, fmt.Errorf("ATA SMART threshold checksum invalid")
-	}
-	return thresholds, nil
 }
 
 // ReadSMARTThresholdsDetailed reads the ATA threshold page and reports whether

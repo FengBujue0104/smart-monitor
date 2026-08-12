@@ -133,7 +133,7 @@ func parseStorageDescriptor(b []byte) (vendor, product, revision, serial string,
 // Discover 枚举 PhysicalDrive 0..maxPhysDrives-1，返回每块盘的统一 Disk（仅元数据 + 已采集的健康属性）。
 // 采集顺序：
 //  1. IOCTL_STORAGE_QUERY_PROPERTY 获取型号/序列/固件/总线类型。
-//  2. 若 BusType=NVMe -> ReadNVMeHealth()。
+//  2. 若 BusType=NVMe -> ReadNVMeHealthWithThresholdsAndTransport()。
 //  3. 否则 (SATA/ATA) -> ReadIdentify + ReadSMARTData + ReadSMARTThresholds
 //
 // 每一步失败则降级：仍返回 Disk（Attrs 可能为空或仅 NVMe 健康属性）。
