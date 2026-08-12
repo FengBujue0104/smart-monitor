@@ -97,6 +97,8 @@ del rsrc.syso
 | 0xE8 Available_Reservd_Space | 预留块/寿命 | 剩余寿命 < 50% | 严重 |
 | 0xAD / 0xB1 / 0xCA / 0xE6 / 0xE7 | 各厂牌剩余寿命字段 | 剩余寿命 < 50% | 严重 |
 
+> 已知厂牌的 E6/E7/E8/E9/CA/AD/B1 按"剩余寿命 < 50% → 严重"判定；**未知厂商**的 E9/E8 归一化值含义不明确，0%（耗尽）→ 严重、1~50% → 警告；其余 0xAD（磨损计数）等仍按设备阈值判定。
+
 > 注：厂商只为少数关键属性设置设备阈值（KIOXIA 仅 `A9/C2`，WD Blue SA510 仅 `05/AD/B8/C2/E8` 等），这与 CrystalDiskInfo 完全一致；其余条目按 Raw/Value 动态规则判断，不表示"未检测"。表格新增"含义"列，每个属性都附中文说明。
 
 ### NVMe
@@ -126,20 +128,24 @@ ATA SMART 数据页校验和异常会作为数据完整性警告显示，并触�
 
 ```
 .
-├── main.go                # 入口
-├── smart/                 # SMART 采集（纯 Go Win32 IOCTL）
+├── main.go                # 入口：启动即弹窗，后台扫描
+├── smart/                 # SMART 采集（纯 Go Win32 IOCTL / WMI）
 │   ├── types.go           # 统一数据结构
 │   ├── win32.go           # IOCTL 常量与设备打开
-│   ├── ata.go             # ATA SMART / IDENTIFY
-│   ├── nvme.go            # NVMe Get Log Page
-│   ├── enum.go            # 磁盘枚举
-│   └── attrnames.go       # ATA 属性 ID<->名 权威映射
+│   ├── enum.go            # 磁盘枚举（IOCTL_STORAGE_QUERY_PROPERTY）
+│   ├── discovery.go       # 主路径+WMI 回退合并策略
+│   ├── ata.go             # ATA SMART / IDENTIFY / SAT 桥
+│   ├── nvme.go            # NVMe Get Log Page / Identify
+│   ├── wmi.go             # WMI 回退（MSStorageDriver_FailurePredict*）
+│   ├── attrnames.go       # 属性名 / 中文含义 / 温度与单位判定
+│   └── vendor_profiles.go # 各厂牌已验证的模型语义（寿命/单位/温度）
 ├── health/
 │   └── rules.go           # 阈值判断
 ├── ui/                    # GUI（纯 Go，lxn/walk）
-│   ├── report.go          # 主报表窗
+│   ├── report.go          # 主报表窗 + 后台扫描
 │   ├── clipboard.go       # 剪贴板（Win32 syscall）
-│   └── textreport.go      # 文本报表生成
+│   ├── textreport.go      # 文本报表生成
+│   └── simulation.go      # 内存模拟异常数据（不触盘）
 ├── rsrc/app.manifest      #管理员权限/视觉样式/DPI
 ├── build.bat
 └── README.md

@@ -22,29 +22,32 @@ type Violation = smart.Violation
 // Evaluate 对每块磁盘计算阈值违规列表并返回。
 // 阈值来源：ATA8-ACS + NVMe Base Spec + CrystalDiskInfo + 用户指定规则。
 //
-// ATA 规则（基于权威解读）：
+// ATA 规则（基于权威解读；与实现一一对应）：
 //
-//	0x05 (Reallocated_Sector_Ct)  raw != 0              -> critical 重映射扇区，物理损坏标志
-//	0xC5 (Current_Pending_Sector) raw != 0               -> warning  等待重映射的扇区
-//	0xC6 (Offline_Uncorrectable)   raw != 0               -> warning
-//	0xBB (Reported_Uncorrectable)  raw != 0               -> critical
-//	0x01 (Raw_Read_Error_Rate)     raw != 0 且 value<th   -> warning  （注：WD/Seagate raw 常非零，需 value<thresh）
-//	0x0E                           raw != 0               -> warning  （厂牌特定：三星=过热计数）
-//	0xC2 (Temperature)             > 60°C                 -> critical（用户要求）
-//	                                 > 55°C                 -> warning
-//	0xBC (Command_Timeout)          > 10                   -> warning（用户要求）
-//	0xE9 (Media_Wearout_Indicator)  <= 50                  -> critical（剩余寿命<=50%）
-//	0xE8 (Available_Reservd_Space)  <= 50 (Samsung)        -> warning
-//	0xAD/0xB1 (Wear_Leveling)       极低                    -> warning
+//	0x05 (Reallocated_Sector_Ct)  raw != 0        -> critical 重映射扇区，物理损坏标志
+//	0xC5 (Current_Pending_Sector) raw != 0        -> warning  等待重映射的扇区
+//	0xC6 (Offline_Uncorrectable)  raw != 0        -> warning
+//	0xBB (Reported_Uncorrectable) raw != 0        -> critical
+//	0x01 (Raw_Read_Error_Rate)    value <= thresh -> warning  （WD/Seagate raw 常非零，只看归一化值与设备阈值）
+//	0x0E                           不设默认告警   （厂牌特定：三星=过热计数，无法通用判断）
+//	0xC2/0xB9/0xBE/0xF3 (温度)    raw&0xFF > 60°C -> critical；> 55°C -> warning（用户要求；F3 仅 YMTC）
+//	0xBC (Command_Timeout)        raw > 10        -> warning（用户要求）
+//	E6/E7/E8/E9/CA/AD/B1（各厂牌剩余寿命字段）：
+//	  有 model-scoped 寿命解释（KIOXIA AD、Samsung B1、WD E6、SSSTC/Apacer E7、
+//	  Micron/Crucial CA、Plextor E8、SK hynix E9…）-> 剩余寿命 < 50% critical
+//	  未知厂商的 E9/E8 归一化 Value：0（耗尽）-> critical；1~50 -> warning
+//	  其余 0xAD（磨损计数）等 -> 设备阈值（pre-fail=critical / old-age=warning）
 //
 // NVMe 规则：
 //
-//	MediaErrors (!= 0)                                     -> critical
-//	PercentageUsed >= 50                                   -> critical（剩余寿命<=50%）
-//	Temperature(K) > 333 (60°C)                            -> critical
-//	Temperature(K) > 328 (55°C)                            -> warning
-//	CriticalWarning != 0                                   -> critical
-//	AvailableSpare < Threshold                             -> critical
+//	MediaErrors != 0                                     -> critical
+//	PercentageUsed > 50（剩余寿命 < 50%）                -> critical
+//	复合温度：>= 控制器 WCTEMP/CCTEMP（缺省 55°C/60°C） -> warning / critical
+//	CriticalWarning != 0                                 -> critical
+//	EnduranceGroupCriticalWarningSummary != 0            -> critical
+//	AvailableSpare < 设备阈值                             -> critical
+//	ReadOnly（CriticalWarning bit3）                     -> critical
+//	Temperature Sensor 1-8 仅展示，不告警（厂商自定义位置，无通用阈值）
 func Evaluate(disks []smart.Disk) []Violation {
 	var out []Violation
 	for _, d := range disks {
