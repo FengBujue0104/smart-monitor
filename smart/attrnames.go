@@ -1,6 +1,9 @@
 package smart
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // ATAAttrName 返回 ATA 属性 ID 的规范名（来源：smartmontools attributedictionary.h / ATA8-ACS / CrystalDiskInfo）。
 // 注：0x0E 与 0xBC 在 ATA 规范中未统一定义（厂商特定），保留最常见厂牌含义。
@@ -354,4 +357,270 @@ var dict = map[int]string{
 	0xEB: "Good_Block_Count",
 	0xF1: "Total_LBAs_Written",
 	0xF2: "Total_LBAs_Read",
+}
+
+// chineseDict 通用 ATA 属性 ID 的中文含义，对照 CrystalDiskInfo 官方中文名。
+var chineseDict = map[int]string{
+	0x01: "底层数据读取错误率",
+	0x02: "磁盘性能",
+	0x03: "电机起转时间",
+	0x04: "起停/加载周期计数",
+	0x05: "重新分配扇区计数（重映射坏扇区）",
+	0x06: "读取通道余量",
+	0x07: "寻道错误率",
+	0x08: "寻道时间性能",
+	0x09: "通电时间（小时）",
+	0x0A: "起转重试次数",
+	0x0B: "校准重试次数",
+	0x0C: "通电次数",
+	0x0E: "设备过热计数（厂牌特定）",
+	0x10: "软 ECC 纠错次数",
+	0x22: "氦气水平",
+	0xA7: "SSD 保留备用块",
+	0xAA: "芯片已用保留块计数",
+	0xAB: "芯片编程失败计数",
+	0xAD: "磨损均衡计数",
+	0xB1: "磨损均衡计数（三星=剩余寿命）",
+	0xB3: "软读取错误率",
+	0xB5: "编程失败计数",
+	0xB6: "多区域错误率",
+	0xB7: "SATA 降速错误计数",
+	0xB8: "端到端错误",
+	0xB9: "温度（备用传感器）",
+	0xBA: "高飞写入",
+	0xBB: "报告的不可校正错误",
+	0xBC: "命令超时计数",
+	0xBD: "震动传感器错误率",
+	0xBE: "气流温度",
+	0xC0: "意外断电退回次数",
+	0xC1: "磁头加载周期计数",
+	0xC2: "温度（摄氏度）",
+	0xC3: "硬件 ECC 恢复",
+	0xC4: "重新分配事件计数",
+	0xC5: "当前待映射扇区（坏道候选）",
+	0xC6: "离线不可校正错误",
+	0xC7: "UDMA CRC 错误计数（线缆/接口）",
+	0xC8: "写入错误率",
+	0xCA: "数据地址标记错误（寿命相关）",
+	0xCE: "磁头飞行高度",
+	0xD1: "离线寻道性能",
+	0xD3: "写入时振动",
+	0xD4: "写入时冲击",
+	0xDC: "盘片位移",
+	0xDE: "磁头加载时间",
+	0xDF: "加载/卸载重试次数",
+	0xE1: "加载/卸载周期计数",
+	0xE7: "SSD 剩余寿命（%）",
+	0xE8: "可用预留空间（%）",
+	0xE9: "介质磨损指示（%）",
+	0xEA: "平均擦除计数",
+	0xF1: "主机写入总量",
+	0xF2: "主机读取总量",
+}
+
+// vendorChinese 厂商特定属性 ID 的中文含义（对照 CrystalDiskInfo）。
+func vendorChinese(model string, id int) (string, bool) {
+	m := strings.ToLower(model)
+	switch {
+	case strings.Contains(m, "kioxia"):
+		switch id {
+		case 0xA7:
+			return "固态硬盘保护模式（只读不写）", true
+		case 0xA8:
+			return "SATA 物理层错误计数", true
+		case 0xA9:
+			return "坏块计数", true
+		case 0xAD:
+			return "擦除计数（用户数据）", true
+		case 0xC0:
+			return "意外断电计数", true
+		case 0xF1:
+			return "主机写入（32 MB/单位）", true
+		}
+	case strings.Contains(m, "wd blue"):
+		switch id {
+		case 0xA5:
+			return "块擦除计数（SLC）", true
+		case 0xA6:
+			return "最小 PE（编程/擦除）次数", true
+		case 0xA7:
+			return "单个裸片最大坏块数", true
+		case 0xA8:
+			return "最大 PE（编程/擦除）次数", true
+		case 0xA9:
+			return "坏块总计", true
+		case 0xAA:
+			return "新增坏块", true
+		case 0xAB:
+			return "编程失败计数", true
+		case 0xAC:
+			return "擦除失败计数", true
+		case 0xAD:
+			return "平均 PE（编程/擦除）次数", true
+		case 0xAE:
+			return "意外断电计数", true
+		case 0xB8:
+			return "端到端错误检测/校正计数", true
+		case 0xBB:
+			return "报告的不可校正错误", true
+		case 0xBC:
+			return "命令超时计数", true
+		case 0xC2:
+			return "温度（摄氏度）", true
+		case 0xC7:
+			return "CRC 错误计数", true
+		case 0xE6:
+			return "介质磨损指示器（剩余寿命）", true
+		case 0xE8:
+			return "剩余备用块", true
+		case 0xE9:
+			return "NAND 总计写入（GB）", true
+		case 0xEA:
+			return "NAND 总计写入（SLC，GB）", true
+		case 0xF1:
+			return "总计写入（GB）", true
+		case 0xF2:
+			return "总计读取（GB）", true
+		case 0xF4:
+			return "温控状态", true
+		}
+	case IsSamsungSATASSDModel(model):
+		switch id {
+		case 0xB1:
+			return "磨损均衡计数（剩余寿命）", true
+		case 0xB3:
+			return "已用保留块计数", true
+		case 0xB5:
+			return "编程失败计数", true
+		case 0xB6:
+			return "擦除失败计数", true
+		case 0xE8:
+			return "可用预留空间（剩余寿命%）", true
+		case 0xF1:
+			return "主机写入（512 B/单位）", true
+		case 0xF2:
+			return "主机读取（512 B/单位）", true
+		}
+	case IsCrucial32MBHostCounterModel(model) || isCrucialSATA(model) || isMicronSATA(model):
+		switch id {
+		case 0xCA:
+			return "SSD 剩余寿命（%）", true
+		case 0xF1:
+			return "主机写入（32 MB/单位）", true
+		case 0xF2:
+			return "主机读取（32 MB/单位）", true
+		}
+	case IsIntelOrSolidigmSATAModel(model):
+		switch id {
+		case 0xF1:
+			return "主机写入（32 MB/单位）", true
+		case 0xF3:
+			return "NAND 写入（32 MB/单位）", true
+		}
+	case isSsstcSATA(model) || isApacerSATA(model) || isRecadataSATA(model) || isCorsairVoyagerGTXSATA(model) || isSiliconMotionCVCSATA(model):
+		switch id {
+		case 0xE7:
+			return "SSD 剩余寿命（%）", true
+		case 0xCA:
+			return "SSD 剩余寿命（%）", true
+		}
+	case isPlextorSATA(model):
+		switch id {
+		case 0xE8:
+			return "SSD 剩余寿命（%）", true
+		case 0xF1:
+			return "主机写入（32 MB/单位）", true
+		case 0xF2:
+			return "主机读取（32 MB/单位）", true
+		}
+	case strings.Contains(m, "seagate"):
+		switch id {
+		case 0xBC:
+			return "命令超时计数", true
+		case 0xE9:
+			return "NAND 写入（GB）", true
+		case 0xEA:
+			return "NAND 写入（SLC，GB）", true
+		case 0xF1:
+			return "主机写入（GB）", true
+		case 0xF2:
+			return "主机读取（GB）", true
+		}
+	case isSanDiskSATA(model):
+		switch id {
+		case 0xE6:
+			return "介质磨损指示器（剩余寿命）", true
+		case 0xF1:
+			return "主机写入", true
+		case 0xF2:
+			return "主机读取", true
+		}
+	}
+	return "", false
+}
+
+// nvmeChinese NVMe 健康字段伪 ID 的中文含义（NVMe Base Spec）。
+func nvmeChinese(id int) string {
+	switch id {
+	case NVMeCriticalWarning:
+		return "严重警告标志（关键警告）"
+	case NVMeTemperature:
+		return "复合温度（开尔文）"
+	case NVMeAvailableSpare:
+		return "可用备用空间（%）"
+	case NVMeAvailSpareThresh:
+		return "可用备用空间阈值（%）"
+	case NVMePercentUsed:
+		return "已用寿命百分比（%）"
+	case NVMeMediaErrors:
+		return "介质与数据完整性错误计数"
+	case NVMeReadOnly:
+		return "只读模式"
+	case NVMeDataUnitsRead:
+		return "数据读取量（1000×512 B）"
+	case NVMeDataUnitsWritten:
+		return "数据写入量（1000×512 B）"
+	case NVMePowerCycles:
+		return "通电次数"
+	case NVMePowerOnHours:
+		return "通电时间（小时）"
+	case NVMeUnsafeShutdowns:
+		return "不安全关机次数"
+	case NVMeErrorInfoEntries:
+		return "错误信息日志条目数"
+	case NVMeWarningTempTime:
+		return "警告温度累计时间（分钟）"
+	case NVMeCriticalTempTime:
+		return "临界温度累计时间（分钟）"
+	case NVMeEnduranceGroupCriticalWarning:
+		return "寿命组严重警告标志"
+	case NVMeWarningCompositeTempThreshold:
+		return "警告温度阈值（开尔文）"
+	case NVMeCriticalCompositeTempThreshold:
+		return "临界温度阈值（开尔文）"
+	}
+	if id >= NVMeTemperatureSensor1 && id <= NVMeTemperatureSensor8 {
+		return fmt.Sprintf("温度传感器 %d（开尔文）", id-NVMeTemperatureSensor1+1)
+	}
+	return "未知 NVMe 字段 0x" + uitoa(id)
+}
+
+// ATAChineseAttrName 返回 ATA 属性 ID 的中文含义。厂商特定含义优先，
+// 未知 ID 返回英文名（不编造含义）。
+func ATAChineseAttrName(model string, id int) string {
+	if c, ok := vendorChinese(model, id); ok {
+		return c
+	}
+	if c, ok := chineseDict[id]; ok {
+		return c
+	}
+	return ATAAttrName(id)
+}
+
+// AttrMeaning 返回统一属性（ATA/NVMe）的中文含义，供报表与表格使用。
+func AttrMeaning(model string, a Attr) string {
+	if a.Kind == "nvme" {
+		return nvmeChinese(a.ID)
+	}
+	return ATAChineseAttrName(model, a.ID)
 }

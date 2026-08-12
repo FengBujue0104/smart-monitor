@@ -165,74 +165,59 @@ func evaluateATA(d smart.Disk) []Violation {
 			}
 		case 0xE9: // Media_Wearout_Indicator (100=新, 0=耗尽)
 			if life, ok := smart.ATAHealthPercentForModel(d.Model, []smart.Attr{a}); ok {
-				// CrystalDiskInfo uses its configured 10% caution threshold for
-				// vendor life fields, with 0% indicating end of life.
-				if life == 0 {
-					add(a, Critical, "0% (remaining)", "> 0%")
-				} else if life <= 10 {
-					add(a, Warning, its(life)+"% (remaining)", "> 10%")
+				// 用户要求：剩余寿命低于 50% 即红色告警。
+				if life < 50 {
+					add(a, Critical, its(life)+"% (remaining)", "≥ 50%")
 				}
 				break
 			}
-			// 该属性的 raw 可能是写入量/厂商复合值，寿命使用归一化 Value。
-			if a.Value > 0 && a.Value <= 10 {
-				add(a, Critical, its(a.Value)+"% (remaining)", "> 10%")
-			} else if a.Value > 0 && a.Value <= 20 {
-				add(a, Warning, its(a.Value)+"% (remaining)", "> 20%")
+			// 该属性的 raw 可能是写入量/厂商复合值，寿命使用归一化 Value；
+			// 未知厂商保守用 warning。
+			if a.Value > 0 && a.Value <= 50 {
+				add(a, Warning, its(a.Value)+"% (remaining)", "> 50%")
 			}
 		case 0xCA: // Micron/Crucial SSD remaining-life attribute
 			if life, ok := smart.ATAHealthPercentForModel(d.Model, []smart.Attr{a}); ok {
-				if life == 0 {
-					add(a, Critical, "0% (remaining)", "> 0%")
-				} else if life <= 10 {
-					add(a, Warning, its(life)+"% (remaining)", "> 10%")
+				if life < 50 {
+					add(a, Critical, its(life)+"% (remaining)", "≥ 50%")
 				}
 			}
 		case 0xE6: // WD Blue SA510 Media_Wearout_Indicator
 			// CrystalDiskInfo reads remaining life from raw byte 1 for this
-			// model and marks <=10% caution, 0% failure. Other E6 meanings are
-			// vendor-specific, so only use the model-scoped helper.
+			// model. User rule: below 50% remaining life triggers the red alarm.
 			if life, ok := smart.ATAHealthPercentForModel(d.Model, []smart.Attr{a}); ok {
-				if life == 0 {
-					add(a, Critical, "0% (remaining)", "> 0%")
-				} else if life <= 10 {
-					add(a, Warning, its(life)+"% (remaining)", "> 10%")
+				if life < 50 {
+					add(a, Critical, its(life)+"% (remaining)", "≥ 50%")
 				}
 			}
 		case 0xE7: // SSSTC remaining-life field
 			if life, ok := smart.ATAHealthPercentForModel(d.Model, []smart.Attr{a}); ok {
-				if life == 0 {
-					add(a, Critical, "0% (remaining)", "> 0%")
-				} else if life <= 10 {
-					add(a, Warning, its(life)+"% (remaining)", "> 10%")
+				if life < 50 {
+					add(a, Critical, its(life)+"% (remaining)", "≥ 50%")
 				}
 			}
 		case 0xE8: // Available_Reservd_Space (Samsung=life %; WD/Crucial=预留%)
 			if life, ok := smart.ATAHealthPercentForModel(d.Model, []smart.Attr{a}); ok {
-				if life == 0 {
-					add(a, Critical, "0% (remaining)", "> 0%")
-				} else if life <= 10 {
-					add(a, Warning, its(life)+"% (remaining)", "> 10%")
+				if life < 50 {
+					add(a, Critical, its(life)+"% (remaining)", "≥ 50%")
 				}
 				break
 			}
-			if a.Value > 0 && a.Value <= 10 {
-				add(a, Warning, its(a.Value)+"%", "> 10%")
+			// 未知厂商的 E8 含义不明确（预留块 vs 寿命），保守 warning。
+			if a.Value > 0 && a.Value <= 50 {
+				add(a, Warning, its(a.Value)+"%", "> 50%")
 			}
 		case 0xAD, 0xB1: // Wear_Leveling_Count
 			if a.ID == 0xB1 {
-				// CrystalDiskInfo identifies Samsung B1 as remaining life and
-				// uses its default caution threshold of 10%.
+				// Samsung B1 归一化值=剩余寿命；用户要求低于 50% 即红色告警。
 				if life, ok := smart.ATAHealthPercentForModel(d.Model, []smart.Attr{a}); ok {
-					if life == 0 {
-						add(a, Critical, "0% (remaining)", "> 0%")
-					} else if life <= 10 {
-						add(a, Warning, its(life)+"% (remaining)", "> 10%")
+					if life < 50 {
+						add(a, Critical, its(life)+"% (remaining)", "≥ 50%")
 					}
 					break
 				}
 			}
-			// 低归一化值提示磨损
+			// 低归一化值提示磨损（0xAD 擦除计数）
 			if a.Thresh > 0 && a.Value <= a.Thresh {
 				add(a, Warning, its(a.Value), "≥ "+its(a.Thresh))
 			}
@@ -287,10 +272,10 @@ func evaluateNVMe(d smart.Disk) []Violation {
 				add(a, Critical, u128s(a.Raw, a.RawHigh), "= 0")
 			}
 		case smart.NVMePercentUsed:
-			if a.Raw >= 100 {
-				add(a, Critical, u64s(a.Raw)+"% used", "< 100%")
-			} else if a.Raw >= 80 {
-				add(a, Warning, u64s(a.Raw)+"% used", "< 80%")
+			// Percentage Used 是已用寿命百分比；用户要求剩余寿命低于 50% 即红色告警，
+			// 对应 Percentage Used > 50（NVMe 官方在 >=100 时设备通常已锁写）。
+			if a.Raw > 50 {
+				add(a, Critical, u64s(100-a.Raw)+"% remaining (used "+u64s(a.Raw)+"%)", "≥ 50% remaining")
 			}
 		case smart.NVMeTemperature:
 			addNVMeTemperatureViolation(add, a, d.NVMeWarningTempThresholdK, d.NVMeCriticalTempThresholdK)

@@ -64,7 +64,7 @@ func RunReportWithStatus(disks []smart.Disk, violations []health.Violation, stat
 				TextColor: bannerColor,
 			},
 			Label{
-				Text:      fmt.Sprintf("检测时间: %s | 主机: %s", time.Now().Format("2006-01-02 15:04:05"), hostName()),
+				Text:      fmt.Sprintf("检测时间: %s | 主机: %s   |  注：厂商只为少数关键属性设置阈值（与 CrystalDiskInfo 一致），其余条目按 Raw/Value 动态判断", time.Now().Format("2006-01-02 15:04:05"), hostName()),
 				Font:      Font{Family: "微软雅黑", PointSize: 10},
 				TextColor: walk.RGB(0x44, 0x44, 0x44),
 			},
@@ -81,7 +81,8 @@ func RunReportWithStatus(disks []smart.Disk, violations []health.Violation, stat
 					{Title: "类型", Width: 50},
 					{Title: "属性ID", Width: 60},
 					{Title: "标志", Width: 70},
-					{Title: "属性名", Width: 220},
+					{Title: "属性名", Width: 200},
+					{Title: "含义", Width: 260},
 					{Title: "Raw值", Width: 150},
 					{Title: "当前值", Width: 80},
 					{Title: "最差", Width: 60},
@@ -155,6 +156,7 @@ type reportRow struct {
 	id       int
 	flags    string
 	name     string
+	meaning  string
 	raw      string
 	current  string
 	worst    string
@@ -229,6 +231,7 @@ func (m *reportModel) build() {
 				id:       a.ID,
 				flags:    attrFlagsStr(a),
 				name:     a.Name,
+				meaning:  smart.AttrMeaning(d.Model, a),
 				raw:      attrRawStrForModel(d.Model, a),
 				current:  attrCurrentStr(a),
 				worst:    attrWorstStr(a),
@@ -287,14 +290,16 @@ func (m *reportModel) Value(row, col int) interface{} {
 	case 4:
 		return r.name
 	case 5:
-		return r.raw
+		return r.meaning
 	case 6:
-		return r.current
+		return r.raw
 	case 7:
-		return r.worst
+		return r.current
 	case 8:
-		return r.limit
+		return r.worst
 	case 9:
+		return r.limit
+	case 10:
 		return r.status
 	}
 	return ""
@@ -623,6 +628,20 @@ func (rw *ReportWin) rescan() {
 	result := discoverAsync(smart.DiscoverWithFallback)
 	go func() {
 		outcome := <-result
+		// goroutine 中的 panic 会终止整个进程（windowsgui 构建无控制台，
+		// 表现为“点重新扫描程序直接退出”）。WMI/IOCTL 底层偶发 panic，
+		// 统一转为错误显示而非崩溃。
+		defer func() {
+			if r := recover(); r != nil {
+				rw.Synchronize(func() {
+					rw.rescanning = false
+					if rw.rescanBtn != nil {
+						rw.rescanBtn.SetEnabled(true)
+					}
+					rw.showStatus("扫描异常："+fmt.Sprintf("%v", r), walk.RGB(0xB0, 0x20, 0x20))
+				})
+			}
+		}()
 		rw.Synchronize(func() {
 			rw.rescanning = false
 			if rw.rescanBtn != nil {

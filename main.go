@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
 
 	"github.com/lxn/walk"
@@ -32,7 +33,9 @@ func main() {
 		return
 	}
 
-	logFile, err := os.OpenFile("smonitor.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	// 日志默认写 exe 所在目录；失败（如 exe 放在 Program Files 只读目录）时
+	// 回退到 %TEMP%\smonitor.log，保证诊断日志总能落盘。
+	logFile, err := openLogFile()
 	if err == nil {
 		defer logFile.Close()
 		log.SetOutput(logFile)
@@ -63,6 +66,17 @@ func main() {
 
 func mergeFallbackDisks(primary, fallback []smart.Disk) []smart.Disk {
 	return smart.MergeFallbackDisks(primary, fallback)
+}
+
+// openLogFile 优先在当前目录创建日志；不可写时回退到系统临时目录。
+// 返回的 *os.File 为 nil 时调用方应跳过日志输出（静默降级）。
+func openLogFile() (*os.File, error) {
+	f, err := os.OpenFile("smonitor.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err == nil {
+		return f, nil
+	}
+	tmp := filepath.Join(os.TempDir(), "smonitor.log")
+	return os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 }
 
 // isAdmin checks the process token directly. Opening a physical drive is not a

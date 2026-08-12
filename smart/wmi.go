@@ -45,11 +45,21 @@ type wmiDiskDrive struct {
 
 // DiscoverWMI 通过 WMI 枚举磁盘并读取可用的 SMART 属性。
 // 即使 root\WMI SMART 类不可用，只要 Win32_DiskDrive 可查询，仍返回磁盘元数据。
-func DiscoverWMI() ([]Disk, error) {
+func DiscoverWMI() (disks []Disk, err error) {
+	// WMI 查询在后台 goroutine（GUI 重新扫描）中执行。wmi/go-ole 底层在
+	// COM 状态异常或 safearray 类型不匹配时会 panic；goroutine panic 会
+	// 直接终止整个进程（windowsgui 构建无控制台，表现为“点重新扫描程序
+	// 直接退出”）。这里把 panic 转成 error，由 UI 显示而非崩溃。
+	defer func() {
+		if r := recover(); r != nil {
+			disks = nil
+			err = fmt.Errorf("WMI SMART query panicked: %v", r)
+		}
+	}()
 	// 1. 读 Win32_DiskDrive 获取型号/序列/固件/容量
 	var drives []wmiDiskDrive
 	q := wmi.CreateQuery(&drives, "", "Win32_DiskDrive")
-	err := wmi.Query(q, &drives)
+	err = wmi.Query(q, &drives)
 	if err != nil {
 		return nil, fmt.Errorf("Win32_DiskDrive query: %w", err)
 	}
@@ -83,7 +93,6 @@ func DiscoverWMI() ([]Disk, error) {
 		statusMap[s.InstanceName] = s.PredictFailure
 	}
 
-	var disks []Disk
 	for _, drv := range drives {
 		d := Disk{
 			Index:    int(drv.Index),
@@ -265,8 +274,9 @@ func parseWMIAttributes(data []byte) []Attr {
 		value := int(data[off+3])
 		worst := int(data[off+4])
 		flags := uint16(data[off+1]) | uint16(data[off+2])<<8
+		// 48 位 raw 小端；第 6 字节位于第 40 位（<<40），写成 <<48 会放大 256 倍。
 		raw := uint64(data[off+5]) | uint64(data[off+6])<<8 | uint64(data[off+7])<<16 |
-			uint64(data[off+8])<<24 | uint64(data[off+9])<<32 | uint64(data[off+10])<<48
+			uint64(data[off+8])<<24 | uint64(data[off+9])<<32 | uint64(data[off+10])<<40
 		attrs = append(attrs, Attr{
 			ID:    id,
 			Name:  ATAAttrName(id),
@@ -288,7 +298,7 @@ func applyThresholds(attrs []Attr, th []byte) {
 			break
 		}
 		id := int(th[off])
-		// 阈值页布局与数据页相同：记录第 3 字节（off+3）为阈值
+		// 阈值页布局与数据页相同：记录第 1 字节（off+1）为阈值（与 ATA 阈值页一致）。
 		for j := range attrs {
 			if attrs[j].ID == id {
 				attrs[j].Thresh = int(th[off+1])

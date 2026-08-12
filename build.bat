@@ -26,17 +26,79 @@ if not exist "%GOPATHDIR%\bin\rsrc.exe" goto :err
 set "RSRCCMD=%GOPATHDIR%\bin\rsrc.exe"
 
 :rsrc_ready
-echo [1/3] Generating manifest resource...
+echo [1/4] Generating manifest resource...
 "%RSRCCMD%" -manifest rsrc/app.manifest -o rsrc.syso
 if errorlevel 1 goto :err
 
-echo [2/3] Building smonitor.exe...
+echo [2/4] Building smonitor.exe...
 go build -ldflags="-s -w -H windowsgui" -o smonitor.exe
 if errorlevel 1 goto :err
 
-for %%A in (smonitor.exe) do echo [3/3] Done: %%~zA bytes
+echo [3/4] Signing...
+call :sign
+if errorlevel 1 echo   [sign] skipped: no code-signing certificate found.
+
+for %%A in (smonitor.exe) do echo [4/4] Done: %%~zA bytes
 exit /b 0
 
 :err
 echo Build failed.
+exit /b 1
+
+rem ============================================================
+rem Code signing (idempotent: silently skipped when no cert).
+rem Sources, in priority order:
+rem   1) Env var SMONITOR_PFX -> .pfx/.p12 file; optional
+rem      SMONITOR_PFX_PASSWORD supplies the password.
+rem   2) First Code Signing cert in the store (CurrentUser first).
+rem NOTE: keep this file ASCII-only; cmd parses batch files in
+rem the ANSI codepage and non-ASCII text corrupts parsing.
+rem ============================================================
+:sign
+set "SIGNTOOL="
+if exist "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe" set "SIGNTOOL=C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe"
+if not defined SIGNTOOL if exist "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" set "SIGNTOOL=C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe"
+if not defined SIGNTOOL for /f "delims=" %%S in ('where signtool 2^>nul') do if not defined SIGNTOOL set "SIGNTOOL=%%S"
+if not defined SIGNTOOL (
+    echo   [sign] signtool.exe not found; install Windows SDK.
+    exit /b 1
+)
+
+if defined SMONITOR_PFX (
+    if not exist "%SMONITOR_PFX%" (
+        echo   [sign] SMONITOR_PFX set but file not found: "%SMONITOR_PFX%"
+        exit /b 1
+    )
+    if defined SMONITOR_PFX_PASSWORD (
+        "%SIGNTOOL%" sign /fd SHA256 /f "%SMONITOR_PFX%" /p "%SMONITOR_PFX_PASSWORD%" /tr "http://timestamp.digicert.com" /td SHA256 smonitor.exe
+    ) else (
+        "%SIGNTOOL%" sign /fd SHA256 /f "%SMONITOR_PFX%" /tr "http://timestamp.digicert.com" /td SHA256 smonitor.exe
+    )
+    if errorlevel 1 (
+        echo   [sign] signing with pfx failed.
+        exit /b 1
+    )
+    echo   [sign] signed with pfx "%SMONITOR_PFX%"
+    exit /b 0
+)
+
+rem Store certs: CurrentUser first, then LocalMachine.
+rem usebackq backticks allow quotes inside the powershell command.
+set "CERT_TP="
+for /f "usebackq delims=" %%T in (`powershell -NoProfile -Command "(Get-ChildItem 'Cert:\CurrentUser\My' -CodeSigningCert -ErrorAction SilentlyContinue | Sort-Object NotAfter -Descending | Select-Object -First 1).Thumbprint"`) do set "CERT_TP=%%T"
+if defined CERT_TP goto :sign_store
+
+for /f "usebackq delims=" %%T in (`powershell -NoProfile -Command "(Get-ChildItem 'Cert:\LocalMachine\My' -CodeSigningCert -ErrorAction SilentlyContinue | Sort-Object NotAfter -Descending | Select-Object -First 1).Thumbprint"`) do set "CERT_TP=%%T"
+
+:sign_store
+if defined CERT_TP (
+    "%SIGNTOOL%" sign /fd SHA256 /sha1 "%CERT_TP%" /tr "http://timestamp.digicert.com" /td SHA256 smonitor.exe
+    if errorlevel 1 (
+        echo   [sign] signing with store certificate failed.
+        exit /b 1
+    )
+    echo   [sign] signed with store certificate thumbprint %CERT_TP%
+    exit /b 0
+)
+
 exit /b 1

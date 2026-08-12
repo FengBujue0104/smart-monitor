@@ -75,7 +75,9 @@ func TestWDBlueSA510MediaWearoutUsesCrystalDiskInfoLifeRule(t *testing.T) {
 		current  string
 	}{
 		{raw: 0x0200, want: 0}, // 98% remaining, as in the exported report.
-		{raw: 0x5F00, want: 1, severity: Warning, current: "5% (remaining)"},
+		{raw: 0x3200, want: 0}, // 50% remaining: user rule is below 50%.
+		{raw: 0x3300, want: 1, severity: Critical, current: "49% (remaining)"},
+		{raw: 0x5F00, want: 1, severity: Critical, current: "5% (remaining)"},
 		{raw: 0x6400, want: 1, severity: Critical, current: "0% (remaining)"},
 	} {
 		d := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "WD Blue SA510 2.5 500GB SSD", Attrs: []smart.Attr{{ID: 0xE6, Raw: test.raw}}}
@@ -101,7 +103,9 @@ func TestSamsungSATASSDB1UsesRemainingLifeRule(t *testing.T) {
 		severity Severity
 	}{
 		{value: 97, want: 0},
-		{value: 5, want: 1, severity: Warning},
+		{value: 50, want: 0},
+		{value: 49, want: 1, severity: Critical},
+		{value: 5, want: 1, severity: Critical},
 		{value: 0, want: 1, severity: Critical},
 	} {
 		d := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "Samsung SSD 870 EVO 1TB", Attrs: []smart.Attr{{ID: 0xB1, Value: test.value}}}
@@ -120,7 +124,7 @@ func TestSamsungSATASSDB1UsesRemainingLifeRule(t *testing.T) {
 func TestSKHynixRawLifeProfilesUseCrystalDiskInfoThreshold(t *testing.T) {
 	d := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "HFS128G32TND-3110A", Attrs: []smart.Attr{{ID: 0xE9, Raw: 95, Value: 100}}}
 	got := Evaluate([]smart.Disk{d})
-	if len(got) != 1 || got[0].Severity != Warning || got[0].Current != "5% (remaining)" {
+	if len(got) != 1 || got[0].Severity != Critical || got[0].Current != "5% (remaining)" {
 		t.Fatalf("unexpected SK hynix low-life warning: %+v", got)
 	}
 }
@@ -128,7 +132,7 @@ func TestSKHynixRawLifeProfilesUseCrystalDiskInfoThreshold(t *testing.T) {
 func TestSanDiskE6LifeUsesCrystalDiskInfoThreshold(t *testing.T) {
 	d := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "SanDisk SSD PLUS 480GB", Attrs: []smart.Attr{{ID: 0xE6, Raw: 0x5F00}}}
 	got := Evaluate([]smart.Disk{d})
-	if len(got) != 1 || got[0].Severity != Warning || got[0].Current != "5% (remaining)" {
+	if len(got) != 1 || got[0].Severity != Critical || got[0].Current != "5% (remaining)" {
 		t.Fatalf("unexpected SanDisk low-life warning: %+v", got)
 	}
 }
@@ -136,7 +140,7 @@ func TestSanDiskE6LifeUsesCrystalDiskInfoThreshold(t *testing.T) {
 func TestMicronCALifeUsesCrystalDiskInfoThreshold(t *testing.T) {
 	d := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "Micron M600 SATA 256GB", Attrs: []smart.Attr{{ID: 0xCA, Value: 5}}}
 	got := Evaluate([]smart.Disk{d})
-	if len(got) != 1 || got[0].Severity != Warning || got[0].Current != "5% (remaining)" {
+	if len(got) != 1 || got[0].Severity != Critical || got[0].Current != "5% (remaining)" {
 		t.Fatalf("unexpected Micron CA low-life warning: %+v", got)
 	}
 }
@@ -146,15 +150,15 @@ func TestMicronCALifeDoesNotDuplicateDeviceThreshold(t *testing.T) {
 		ID: 0xCA, Name: "SSD_Life_Left", Value: 5, Thresh: 10, Flags: 1,
 	}}}
 	got := Evaluate([]smart.Disk{d})
-	if len(got) != 1 || got[0].Severity != Warning || got[0].Current != "5% (remaining)" {
-		t.Fatalf("CA remaining-life violation = %+v, want one warning", got)
+	if len(got) != 1 || got[0].Severity != Critical || got[0].Current != "5% (remaining)" {
+		t.Fatalf("CA remaining-life violation = %+v, want one critical", got)
 	}
 }
 
 func TestPlextorE8LifeUsesModelScopedRule(t *testing.T) {
 	plextor := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "PLEXTOR PX-256M5Pro", Attrs: []smart.Attr{{ID: 0xE8, Value: 5}}}
 	got := Evaluate([]smart.Disk{plextor})
-	if len(got) != 1 || got[0].Severity != Warning || got[0].Current != "5% (remaining)" {
+	if len(got) != 1 || got[0].Severity != Critical || got[0].Current != "5% (remaining)" {
 		t.Fatalf("Plextor E8 low-life warning = %+v", got)
 	}
 	intelDC := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "INTEL SSDSCKHB480G7", Attrs: []smart.Attr{{ID: 0xCA, Value: 0}}}
@@ -167,7 +171,7 @@ func TestPlextorE8LifeUsesModelScopedRule(t *testing.T) {
 func TestSiliconMotionCVCCALifeUsesModelScopedRule(t *testing.T) {
 	d := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "CVC-128G SATA SSD", Attrs: []smart.Attr{{ID: 0xCA, Value: 5}}}
 	got := Evaluate([]smart.Disk{d})
-	if len(got) != 1 || got[0].Severity != Warning || got[0].Current != "5% (remaining)" {
+	if len(got) != 1 || got[0].Severity != Critical || got[0].Current != "5% (remaining)" {
 		t.Fatalf("CVC CA low-life warning = %+v", got)
 	}
 }
@@ -175,7 +179,7 @@ func TestSiliconMotionCVCCALifeUsesModelScopedRule(t *testing.T) {
 func TestSsstcE7LifeUsesModelScopedRule(t *testing.T) {
 	d := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "CV8-8E256-HP", Attrs: []smart.Attr{{ID: 0xE7, Value: 5, Thresh: 10, Flags: 1}}}
 	got := Evaluate([]smart.Disk{d})
-	if len(got) != 1 || got[0].Severity != Warning || got[0].Current != "5% (remaining)" {
+	if len(got) != 1 || got[0].Severity != Critical || got[0].Current != "5% (remaining)" {
 		t.Fatalf("SSSTC E7 low-life warning = %+v", got)
 	}
 }
@@ -191,7 +195,7 @@ func TestApacerE7LifeUsesModelScopedRule(t *testing.T) {
 func TestRecadataE7LifeUsesModelScopedRule(t *testing.T) {
 	d := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "RECADATA RS1 512GB", Attrs: []smart.Attr{{ID: 0xE7, Value: 5}}}
 	got := Evaluate([]smart.Disk{d})
-	if len(got) != 1 || got[0].Severity != Warning || got[0].Current != "5% (remaining)" {
+	if len(got) != 1 || got[0].Severity != Critical || got[0].Current != "5% (remaining)" {
 		t.Fatalf("RECADATA E7 low-life = %+v", got)
 	}
 }
@@ -199,7 +203,7 @@ func TestRecadataE7LifeUsesModelScopedRule(t *testing.T) {
 func TestCorsairVoyagerGTXE7LifeUsesModelScopedRule(t *testing.T) {
 	d := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "Corsair Voyager GTX 128GB", Attrs: []smart.Attr{{ID: 0xE7, Value: 5}}}
 	got := Evaluate([]smart.Disk{d})
-	if len(got) != 1 || got[0].Severity != Warning || got[0].Current != "5% (remaining)" {
+	if len(got) != 1 || got[0].Severity != Critical || got[0].Current != "5% (remaining)" {
 		t.Fatalf("Corsair E7 low-life = %+v", got)
 	}
 }
@@ -323,13 +327,24 @@ func TestDedicatedATAThresholdDoesNotCreateDuplicateGenericViolation(t *testing.
 	}
 }
 
-func TestNVMePercentageUsedIsNotFailureAtFiftyPercent(t *testing.T) {
-	for _, value := range []uint64{50, 79} {
+func TestNVMePercentageUsedFollowsUserRemainingLifeRule(t *testing.T) {
+	// 用户要求：剩余寿命低于 50% 即红色告警。
+	// Percentage Used <= 50（剩余 >= 50%）不告警；> 50 告警 critical。
+	for _, value := range []uint64{30, 50} {
 		d := smart.Disk{Index: 0, Kind: smart.KindNVMe, Attrs: []smart.Attr{{
 			ID: smart.NVMePercentUsed, Raw: value,
 		}}}
 		if got := Evaluate([]smart.Disk{d}); len(got) != 0 {
 			t.Fatalf("unexpected warning at %d%% used: %+v", value, got)
+		}
+	}
+	for _, value := range []uint64{51, 80, 100} {
+		d := smart.Disk{Index: 0, Kind: smart.KindNVMe, Attrs: []smart.Attr{{
+			ID: smart.NVMePercentUsed, Raw: value,
+		}}}
+		got := Evaluate([]smart.Disk{d})
+		if len(got) != 1 || got[0].Severity != Critical {
+			t.Fatalf("expected critical at %d%% used: %+v", value, got)
 		}
 	}
 }

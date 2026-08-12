@@ -27,8 +27,10 @@ func TestSimulatedDiskFailuresProduceFeedbackReport(t *testing.T) {
 			warning++
 		}
 	}
-	if critical != 5 || warning != 3 {
-		t.Fatalf("severity counts critical=%d warning=%d, want 5/3: %+v", critical, warning, violations)
+	// 剩余寿命规则为“低于 50% 即红色告警”：E6(5%) 与 NVMe PercentUsed(80%)
+	// 均为 critical，只有 BC(Command_Timeout) 是 warning。
+	if critical != 7 || warning != 1 {
+		t.Fatalf("severity counts critical=%d warning=%d, want 7/1: %+v", critical, warning, violations)
 	}
 
 	report := ui.BuildExceptionReportForTest(disks, violations)

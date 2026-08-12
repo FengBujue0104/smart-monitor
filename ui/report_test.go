@@ -191,7 +191,7 @@ func TestReportModelShowsSMARTReadFailureReason(t *testing.T) {
 	m := &reportModel{disks: []smart.Disk{{
 		Index: 4, Kind: smart.KindNVMe, Model: "USB NVMe", SMARTReadError: "NVMe Health Log: access denied",
 	}}}
-	if got := m.Value(0, 6); got != "NVMe Health Log: access denied" {
+	if got := m.Value(0, 7); got != "NVMe Health Log: access denied" {
 		t.Fatalf("SMART read failure reason = %q", got)
 	}
 }
@@ -214,11 +214,11 @@ func TestReportModelShowsDiskLevelSMARTDiagnostics(t *testing.T) {
 	if got := m.RowCount(); got != 3 {
 		t.Fatalf("row count = %d, want 3", got)
 	}
-	if got := m.Value(0, 4); got != "SMART_Overall_Health" || m.Value(0, 9) != "❌ 严重" {
-		t.Fatalf("unexpected overall diagnostic row: name=%q status=%q", got, m.Value(0, 9))
+	if got := m.Value(0, 4); got != "SMART_Overall_Health" || m.Value(0, 10) != "❌ 严重" {
+		t.Fatalf("unexpected overall diagnostic row: name=%q status=%q", got, m.Value(0, 10))
 	}
-	if got := m.Value(1, 2); got != "-" || m.Value(1, 4) != "SMART_Data_Checksum" || m.Value(1, 9) != "⚠️ 警告" {
-		t.Fatalf("unexpected checksum diagnostic row: id=%q name=%q status=%q", got, m.Value(1, 4), m.Value(1, 9))
+	if got := m.Value(1, 2); got != "-" || m.Value(1, 4) != "SMART_Data_Checksum" || m.Value(1, 10) != "⚠️ 警告" {
+		t.Fatalf("unexpected checksum diagnostic row: id=%q name=%q status=%q", got, m.Value(1, 4), m.Value(1, 10))
 	}
 }
 

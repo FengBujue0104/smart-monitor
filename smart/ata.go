@@ -368,10 +368,12 @@ func parseSMARTData(data []byte) []Attr {
 		flags := uint16(data[off+1]) | uint16(data[off+2])<<8
 		// SMART raw 值为 48 位（6 字节），但某些厂商打包为 32 位。
 		// 低 48 位取自 data[off+5..off+11)，小端。
+		// 注意第 6 个字节（data[off+10]）是 48 位值的最高字节，位于第 40 位（<<40）；
+		// 写成 <<48 会把该字节放大 256 倍（6 字节 raw 含非零最高字节时数值错乱）。
 		var raw uint64
 		if off+11 <= len(data) {
 			raw = uint64(data[off+5]) | uint64(data[off+6])<<8 | uint64(data[off+7])<<16 |
-				uint64(data[off+8])<<24 | uint64(data[off+9])<<32 | uint64(data[off+10])<<48
+				uint64(data[off+8])<<24 | uint64(data[off+9])<<32 | uint64(data[off+10])<<40
 		}
 		attrs = append(attrs, Attr{
 			ID:    id,

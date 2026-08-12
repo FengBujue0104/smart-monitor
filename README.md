@@ -16,6 +16,29 @@ Windows 10/11 兼容、单 .exe 分发。读取物理硬盘的 S.M.A.R.T 属性�
 
 产物：`smonitor.exe`（单文件，无额外 DLL）
 
+### 代码签名（可选，自动跳过）
+
+`build.bat` 在构建后自动签名，按以下优先级查找证书；都没有时静默跳过，不影响构建：
+
+1. **PFX 文件**：设置环境变量后直接构建：
+
+   ```bat
+   set SMONITOR_PFX=C:\path\cert.pfx
+   set SMONITOR_PFX_PASSWORD=密码      （可省略，省略则交互输入）
+   .\build.bat
+   ```
+
+2. **证书存储**：`CurrentUser\My` / `LocalMachine\My` 中第一个有效期最长的 Code Signing 证书（自动选用，无需配置）。
+
+签名使用 SHA256 + RFC 3161 时间戳（`/fd SHA256 /tr http://timestamp.digicert.com /td SHA256`）。需要 Windows SDK 的 `signtool.exe`（Windows 10 SDK 自带）。
+
+> 注：签名只消除 SmartScreen"未知发布者"提示。要让 Windows 完全信任，证书须由受信任的公共 CA（如 DigiCert、GlobalSign、Let's Encrypt 不支持代码签名）签发；自签名或测试证书仅用于内部验证。
+
+### 日志文件
+
+- 默认写入 exe 所在目录的 `smonitor.log`；
+- 若目录不可写（如放在 `Program Files` 下），自动回退到 `%TEMP%\smonitor.log`。
+
 ## 采集方式
 
 - **主路径 — IOCTL**：枚举 `PhysicalDrive0..255`，通过 `IOCTL_STORAGE_QUERY_PROPERTY` 读取型号/序列号/总线类型；ATA 使用 `IOCTL_SMART_RCV_DRIVE_DATA` 与 ATA pass-through，NVMe 使用 `IOCTL_STORAGE_PROTOCOL_COMMAND` 读取 Health Log Page 0x02。
@@ -30,7 +53,7 @@ Windows 10/11 兼容、单 .exe 分发。读取物理硬盘的 S.M.A.R.T 属性�
 | 型号范围 | 专用解释 |
 |---|---|
 | KIOXIA SATA SSD | `F1` 主机写入按 32 MB 单位；`AD` 显示健康度 |
-| WD Blue SA510 | `F1/F2/E9` 直接以 GB 显示；`E6` 显示健康度，≤10% 警告、0% 严重 |
+| WD Blue SA510 | `F1/F2/E9` 直接以 GB 显示；`E6` 显示健康度（剩余寿命，低于 50% 严重） |
 | 致态 / ZHITAI (YMTC) SATA | `F3` 为温度；`F1/F2` 按 512 B LBA 显示 |
 | Samsung SATA SSD | `B1` 为剩余寿命；`F1/F2` 按 512 B LBA 显示；不作用于 Samsung HDD |
 | Crucial MX/BX100/200/300/500 SATA | `F1/F2` 按 32 MB 单位显示 |
@@ -54,14 +77,17 @@ Windows 10/11 兼容、单 .exe 分发。读取物理硬盘的 S.M.A.R.T 属性�
 | 0xC2 Temperature | 温度 | > 60°C | 严重 |
 | 0xC2 Temperature | 温度 | > 55°C | 警告 |
 | 0xBC Command_Timeout | 命令超时 | raw > 10 | 警告 |
-| 0xE9 Media_Wearout_Indicator | SSD 寿命 | <= 10% 严重；<= 20% 警告 |
-| 0xE8 Available_Reservd_Space | 预留块/寿命 | <= 10% | 警告 |
+| 0xE9 Media_Wearout_Indicator | SSD 寿命 | 剩余寿命 < 50% | 严重 |
+| 0xE8 Available_Reservd_Space | 预留块/寿命 | 剩余寿命 < 50% | 严重 |
+| 0xAD / 0xB1 / 0xCA / 0xE6 / 0xE7 | 各厂牌剩余寿命字段 | 剩余寿命 < 50% | 严重 |
+
+> 注：厂商只为少数关键属性设置设备阈值（KIOXIA 仅 `A9/C2`，WD Blue SA510 仅 `05/AD/B8/C2/E8` 等），这与 CrystalDiskInfo 完全一致；其余条目按 Raw/Value 动态规则判断，不表示"未检测"。表格新增"含义"列，每个属性都附中文说明。
 
 ### NVMe
 | 字段 | 条件 | 严重度 |
 |---|---|---|
 | Media_Data_Integrity_Errors ("0E") | != 0 | 严重 |
-| Percentage_Used | >= 100% 严重；>= 80% 警告 |
+| Percentage_Used | 已用 > 50%（剩余寿命 < 50%） | 严重 |
 | Temperature | > 60°C | 严重 |
 | Temperature Sensor 1–8 | > 60°C | 严重 |
 | Critical_Warning | != 0 | 严重 |
@@ -77,6 +103,7 @@ ATA SMART 数据页校验和异常会作为数据完整性警告显示，并触�
 - **0x0E / 0xBC 在 ATA 规范中未统一定义**；0x0E 不设默认告警，0xBC 的累计值超过 10 时作为兼容性警告显示。
 - **0x05 与 0xBB** 是 ATA 失效的最可靠指标，任何非零均视为风险。
 - **NVMe 路径**中的 "Media and Data Integrity Errors" 字段才是用户定义的 0E 语义在 NVMe 中的真正对应。
+- **阈值少是正常的**：设备阈值由厂商写入 SMART 阈值页，多数 SSD 厂商只为少数属性设置阈值（与 CrystalDiskInfo 的 Thr 列一致），判断仍然覆盖所有关键属性。
 
 ## 项目结构
 
