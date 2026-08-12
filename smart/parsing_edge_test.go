@@ -21,11 +21,37 @@ func TestSwapUTF16BytesPairsBytesAndKeepsOddTail(t *testing.T) {
 	}
 }
 
-func TestParseNVMeHealthLogRejectsTruncatedLog(t *testing.T) {
-	// 日志短于 0xC8 字节（复合温度时间字段末尾）时必须整体拒绝，
-	// 不能返回部分解析结果误导为完整健康数据。
-	if got := parseNVMeHealthLog(make([]byte, 0xC7)); got != nil {
-		t.Fatalf("truncated NVMe log parsed as %d attrs, want nil", len(got))
+func TestParseNVMeHealthLogToleratesTruncatedPage(t *testing.T) {
+	// 截断页（0x07..0xC7 之间）：核心健康字段齐全即可解析，缺失的可选
+	// 计数器/温度时间按边界跳过，不能整页丢弃导致盘显示“SMART 未读取”。
+	data := make([]byte, 0x40)
+	data[0] = 0x02 // CriticalWarning
+	data[1], data[2] = 0x2C, 0x01 // Temperature = 300K
+	data[3], data[4], data[5] = 95, 10, 7 // spare / threshold / pct used
+	data[0x20] = 100                       // DataUnitsRead 低位
+
+	attrs := parseNVMeHealthLog(data)
+	if attrs == nil {
+		t.Fatal("truncated but core-complete NVMe log must parse")
+	}
+	values := map[int]uint64{}
+	for _, a := range attrs {
+		values[a.ID] = a.Raw
+	}
+	if values[NVMeCriticalWarning] != 0x02 || values[NVMeTemperature] != 300 ||
+		values[NVMeAvailableSpare] != 95 || values[NVMeAvailSpareThresh] != 10 || values[NVMePercentUsed] != 7 {
+		t.Fatalf("core fields lost on truncated page: %+v", values)
+	}
+	// 越界的可选字段为 0，不能触发告警
+	if values[NVMeMediaErrors] != 0 {
+		t.Fatalf("out-of-bounds media errors must be 0, got %d", values[NVMeMediaErrors])
+	}
+}
+
+func TestParseNVMeHealthLogRejectsTinyLog(t *testing.T) {
+	// 不足 0x07（连核心块都没有）时必须整体拒绝。
+	if got := parseNVMeHealthLog(make([]byte, 0x06)); got != nil {
+		t.Fatalf("tiny NVMe log parsed as %d attrs, want nil", len(got))
 	}
 }
 

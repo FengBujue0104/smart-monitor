@@ -197,10 +197,13 @@ func parseNVMeProtocolStatus(buf []byte) error {
 //	0xC0    4     WarningCompTempTime（分钟）
 //	0xC4    4     CriticalCompTempTime（分钟）
 //	0xC8    8*2   SensorTemperature[8]（开尔文）
+//
+// 规范页为 512 字节，但部分控制器/桥接会返回截断页。核心健康字段
+// （CriticalWarning..PercentageUsed 等）集中在开头，因此只要求前 0x07 字节；
+// 缺失的可选计数器/温度时间按边界跳过，而不是把整页丢弃——否则一块日志
+// 截断的盘会显示“SMART 未读取”却没有任何错误说明。
 func parseNVMeHealthLog(data []byte) []Attr {
-	// 基础健康字段到 CriticalCompTempTime 末尾（0xC8）。温度传感器
-	// 数组是可选的，因此不能因日志只携带部分传感器而拒绝整个页面。
-	if len(data) < 0xC8 {
+	if len(data) < 0x07 {
 		return nil
 	}
 	var attrs []Attr
@@ -211,15 +214,15 @@ func parseNVMeHealthLog(data []byte) []Attr {
 	spareThresh := data[0x04]
 	pctUsed := data[0x05]
 	enduranceGroupCW := data[0x06]
-	dataUnitsRead, dataUnitsReadHigh := readNVMeUint128(data, 0x20)
-	dataUnitsWritten, dataUnitsWrittenHigh := readNVMeUint128(data, 0x30)
-	powerCycles, powerCyclesHigh := readNVMeUint128(data, 0x70)
-	powerOnHours, powerOnHoursHigh := readNVMeUint128(data, 0x80)
-	unsafeShutdowns, unsafeShutdownsHigh := readNVMeUint128(data, 0x90)
-	mediaErrors, mediaErrorsHigh := readNVMeUint128(data, 0xA0)
-	errorInfoEntries, errorInfoEntriesHigh := readNVMeUint128(data, 0xB0)
-	warningTempTime := uint64(binary.LittleEndian.Uint32(data[0xC0:0xC4]))
-	criticalTempTime := uint64(binary.LittleEndian.Uint32(data[0xC4:0xC8]))
+	dataUnitsRead, dataUnitsReadHigh := nvmeUint128At(data, 0x20)
+	dataUnitsWritten, dataUnitsWrittenHigh := nvmeUint128At(data, 0x30)
+	powerCycles, powerCyclesHigh := nvmeUint128At(data, 0x70)
+	powerOnHours, powerOnHoursHigh := nvmeUint128At(data, 0x80)
+	unsafeShutdowns, unsafeShutdownsHigh := nvmeUint128At(data, 0x90)
+	mediaErrors, mediaErrorsHigh := nvmeUint128At(data, 0xA0)
+	errorInfoEntries, errorInfoEntriesHigh := nvmeUint128At(data, 0xB0)
+	warningTempTime := nvmeUint32At(data, 0xC0)
+	criticalTempTime := nvmeUint32At(data, 0xC4)
 
 	attrs = append(attrs, Attr{ID: NVMeCriticalWarning, Name: "Critical_Warning", Raw: uint64(cw), Kind: "nvme"})
 	attrs = append(attrs, Attr{ID: NVMeTemperature, Name: "Temperature_Kelvin", Raw: uint64(tempK), Kind: "nvme"})
@@ -245,6 +248,22 @@ func parseNVMeHealthLog(data []byte) []Attr {
 		attrs = append(attrs, Attr{ID: NVMeReadOnly, Name: "Read_Only_Mode", Raw: 1, Kind: "nvme"})
 	}
 	return attrs
+}
+
+// nvmeUint128At 读取小端 128 位计数器的低/高 64 位；字段越界（截断页）时返回 0。
+func nvmeUint128At(data []byte, off int) (low, high uint64) {
+	if off+16 > len(data) {
+		return 0, 0
+	}
+	return readNVMeUint128(data, off)
+}
+
+// nvmeUint32At 读取小端 32 位字段；字段越界（截断页）时返回 0。
+func nvmeUint32At(data []byte, off int) uint64 {
+	if off+4 > len(data) {
+		return 0
+	}
+	return uint64(binary.LittleEndian.Uint32(data[off : off+4]))
 }
 
 func readNVMeUint128(data []byte, off int) (low, high uint64) {
