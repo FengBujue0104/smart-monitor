@@ -19,6 +19,7 @@ type ReportWin struct {
 	violations []health.Violation
 	tv         *walk.TableView
 	banner     *walk.Label
+	stampLbl   *walk.Label
 	rescanBtn  *walk.PushButton
 	rescanning bool
 }
@@ -31,6 +32,14 @@ type discoveryResult struct {
 func discoverAsync(discover func() ([]smart.Disk, error)) <-chan discoveryResult {
 	result := make(chan discoveryResult, 1)
 	go func() {
+		// 扫描 goroutine 内的 panic 必须在发送结果前转成 error，否则调用方
+		// 会永久阻塞在 <-result（windowsgui 构建无控制台，表现为“点重新扫描
+		// 程序没反应”）。WMI 底层（go-ole）偶发 panic，这里兜底。
+		defer func() {
+			if r := recover(); r != nil {
+				result <- discoveryResult{disks: nil, err: fmt.Errorf("扫描过程中发生异常: %v", r)}
+			}
+		}()
 		disks, err := discover()
 		result <- discoveryResult{disks: disks, err: err}
 	}()
@@ -64,7 +73,8 @@ func RunReportWithStatus(disks []smart.Disk, violations []health.Violation, stat
 				TextColor: bannerColor,
 			},
 			Label{
-				Text:      fmt.Sprintf("检测时间: %s | 主机: %s   |  注：厂商只为少数关键属性设置阈值（与 CrystalDiskInfo 一致），其余条目按 Raw/Value 动态判断", time.Now().Format("2006-01-02 15:04:05"), hostName()),
+				AssignTo:  &rw.stampLbl,
+				Text:      rw.stampText(),
 				Font:      Font{Family: "微软雅黑", PointSize: 10},
 				TextColor: walk.RGB(0x44, 0x44, 0x44),
 			},
@@ -134,6 +144,13 @@ func reportBanner(disks []smart.Disk, violations []health.Violation, status stri
 		return status + "\n" + text, walk.RGB(0xB0, 0x20, 0x20)
 	}
 	return text, color
+}
+
+// stampText 生成“检测时间”行。每次扫描（含重新扫描）都应刷新，
+// 否则挂机后看到的是旧的检测时间，误判数据新鲜度。
+func (rw *ReportWin) stampText() string {
+	return fmt.Sprintf("检测时间: %s | 主机: %s   |  注：厂商只为少数关键属性设置阈值（与 CrystalDiskInfo 一致），其余条目按 Raw/Value 动态判断",
+		time.Now().Format("2006-01-02 15:04:05"), hostName())
 }
 
 // ===== 表格模型 =====
@@ -628,9 +645,8 @@ func (rw *ReportWin) rescan() {
 	result := discoverAsync(smart.DiscoverWithFallback)
 	go func() {
 		outcome := <-result
-		// goroutine 中的 panic 会终止整个进程（windowsgui 构建无控制台，
-		// 表现为“点重新扫描程序直接退出”）。WMI/IOCTL 底层偶发 panic，
-		// 统一转为错误显示而非崩溃。
+		// 兜底：discoverAsync 已把扫描 goroutine 的 panic 转成 error；
+		// 这里的 recover 只保护本 goroutine 后续的 UI 更新代码。
 		defer func() {
 			if r := recover(); r != nil {
 				rw.Synchronize(func() {
@@ -683,6 +699,11 @@ func (rw *ReportWin) setReportData(disks []smart.Disk) error {
 			return err
 		}
 		rw.banner.SetTextColor(alertBannerColor(disks, rw.violations))
+	}
+	if rw.stampLbl != nil {
+		if err := rw.stampLbl.SetText(rw.stampText()); err != nil {
+			return err
+		}
 	}
 	if rw.tv != nil {
 		if err := rw.tv.SetModel(&reportModel{disks: disks, violations: rw.violations}); err != nil {

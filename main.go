@@ -64,10 +64,6 @@ func main() {
 	}
 }
 
-func mergeFallbackDisks(primary, fallback []smart.Disk) []smart.Disk {
-	return smart.MergeFallbackDisks(primary, fallback)
-}
-
 // openLogFile 优先在当前目录创建日志；不可写时回退到系统临时目录。
 // 返回的 *os.File 为 nil 时调用方应跳过日志输出（静默降级）。
 func openLogFile() (*os.File, error) {

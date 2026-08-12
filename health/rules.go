@@ -171,9 +171,12 @@ func evaluateATA(d smart.Disk) []Violation {
 				}
 				break
 			}
-			// 该属性的 raw 可能是写入量/厂商复合值，寿命使用归一化 Value；
-			// 未知厂商保守用 warning。
-			if a.Value > 0 && a.Value <= 50 {
+			// 该属性的 raw 可能是写入量/厂商复合值，寿命使用归一化 Value。
+			// 未知厂商保守用 warning；Value=0 是明确的耗尽状态，必须报 critical
+			// （旧代码 `Value > 0` 会漏掉 0% 这个最坏情形）。
+			if a.Value == 0 {
+				add(a, Critical, "0% (remaining)", "≥ 50%")
+			} else if a.Value <= 50 {
 				add(a, Warning, its(a.Value)+"% (remaining)", "> 50%")
 			}
 		case 0xCA: // Micron/Crucial SSD remaining-life attribute
@@ -203,8 +206,11 @@ func evaluateATA(d smart.Disk) []Violation {
 				}
 				break
 			}
-			// 未知厂商的 E8 含义不明确（预留块 vs 寿命），保守 warning。
-			if a.Value > 0 && a.Value <= 50 {
+			// 未知厂商的 E8 含义不明确（预留块 vs 寿命），保守 warning；
+			// Value=0 视为耗尽 → critical（旧代码 `Value > 0` 会漏报）。
+			if a.Value == 0 {
+				add(a, Critical, "0%", "≥ 50%")
+			} else if a.Value <= 50 {
 				add(a, Warning, its(a.Value)+"%", "> 50%")
 			}
 		case 0xAD, 0xB1: // Wear_Leveling_Count
@@ -222,7 +228,7 @@ func evaluateATA(d smart.Disk) []Violation {
 				add(a, Warning, its(a.Value), "≥ "+its(a.Thresh))
 			}
 		}
-		if shouldApplyGenericATAThreshold(d, a) && a.Thresh > 0 && a.Value > 0 && a.Value <= a.Thresh {
+		if shouldApplyGenericATAThreshold(d, a) && a.Thresh > 0 && a.Value <= a.Thresh {
 			severity := Warning
 			if a.Flags&0x0001 != 0 { // ATA SMART 属性标志 bit 0：pre-fail
 				severity = Critical
@@ -240,7 +246,9 @@ func shouldApplyGenericATAThreshold(d smart.Disk, a smart.Attr) bool {
 	if smart.ATATemperatureAttributeForModel(d.Model, a.ID) {
 		return false
 	}
-	if a.ID == 0xE7 {
+	if a.ID == 0xE7 || a.ID == 0xE6 {
+		// E6/E7 都有厂牌“剩余寿命”语义（WD/SanDisk 的 E6、SSSTC/Apacer 等的 E7）。
+		// 专属规则接管时不再走 generic 阈值，避免同一条属性报两条违规。
 		if _, ok := smart.ATAHealthPercentForModel(d.Model, []smart.Attr{a}); ok {
 			return false
 		}

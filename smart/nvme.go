@@ -13,8 +13,11 @@ import (
 // 数据缓冲区通过 DataFromDeviceBufferOffset 指定，不能简单按「头 + 数据」拼接。
 
 const (
-	STORAGE_PROTOCOL_TYPE_NVMe  = 0x01
-	storageProtocolTypeNVMe     = 0x03 // STORAGE_PROTOCOL_TYPE.ProtocolTypeNvme
+	// STORAGE_PROTOCOL_TYPE（SDK ntddstor.h）：ProtocolTypeScsi=1, ProtocolTypeAta=2,
+	// ProtocolTypeNvme=3。曾误写为 0x01（Scsi），会把 NVMe 命令错误地标识为 SCSI，
+	// 部分控制器/驱动会拒绝或走回退路径。
+	STORAGE_PROTOCOL_TYPE_NVMe = 0x03
+	storageProtocolTypeNVMe     = 0x03 // STORAGE_PROTOCOL_TYPE.ProtocolTypeNvme（property 查询路径）
 	storageDeviceProtocolQuery  = 0x32 // StorageDeviceProtocolSpecificProperty
 	nvmeDataTypeLogPage         = 0x02
 	NVMeGetLogPage              = 0x02

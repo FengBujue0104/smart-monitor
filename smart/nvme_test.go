@@ -12,7 +12,8 @@ func TestBuildNVMeGetLogPageUsesProtocolCommandLayout(t *testing.T) {
 	}
 	if binary.LittleEndian.Uint32(buf[0x00:0x04]) != 1 ||
 		binary.LittleEndian.Uint32(buf[0x04:0x08]) != 80 ||
-		binary.LittleEndian.Uint32(buf[0x08:0x0C]) != STORAGE_PROTOCOL_TYPE_NVMe {
+		// SDK ntddstor.h：ProtocolTypeNvme=3。用字面量断言，防止常量被改回 0x01(Scsi)。
+		binary.LittleEndian.Uint32(buf[0x08:0x0C]) != 0x03 {
 		t.Fatalf("invalid protocol header: %x", buf[:16])
 	}
 	if buf[80] != NVMeGetLogPage {

@@ -155,6 +155,44 @@ func TestMicronCALifeDoesNotDuplicateDeviceThreshold(t *testing.T) {
 	}
 }
 
+// E6 与 E7 一样有厂牌“剩余寿命”语义（SanDisk/WD 的 E6）。专属规则接管时
+// generic 设备阈值不得再报一条，否则同一条属性会双报。
+func TestSanDiskE6LifeDoesNotDuplicateDeviceThreshold(t *testing.T) {
+	d := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "SanDisk SSD PLUS 480GB", Attrs: []smart.Attr{{
+		ID: 0xE6, Name: "Media_Wearout_Indicator", Raw: 0x3300, Value: 49, Thresh: 49, Flags: 1,
+	}}}
+	got := Evaluate([]smart.Disk{d})
+	if len(got) != 1 || got[0].Severity != Critical || got[0].Current != "49% (remaining)" {
+		t.Fatalf("E6 remaining-life violation = %+v, want exactly one critical", got)
+	}
+}
+
+// 未知厂商的 E9 寿命字段：0% 是明确的耗尽状态，必须 critical
+// （旧代码 `Value > 0` 会漏掉这个最坏情形）。
+func TestUnknownVendorE9ZeroValueIsCritical(t *testing.T) {
+	d := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "Generic SSD", Attrs: []smart.Attr{{ID: 0xE9, Value: 0}}}
+	got := Evaluate([]smart.Disk{d})
+	if len(got) != 1 || got[0].Severity != Critical || got[0].Current != "0% (remaining)" {
+		t.Fatalf("unknown-vendor E9 at 0%% remaining = %+v, want one critical", got)
+	}
+}
+
+func TestUnknownVendorE9LowValueIsWarning(t *testing.T) {
+	d := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "Generic SSD", Attrs: []smart.Attr{{ID: 0xE9, Value: 49}}}
+	got := Evaluate([]smart.Disk{d})
+	if len(got) != 1 || got[0].Severity != Warning || got[0].Current != "49% (remaining)" {
+		t.Fatalf("unknown-vendor E9 at 49%% = %+v, want one warning", got)
+	}
+}
+
+func TestUnknownVendorE8ZeroValueIsCritical(t *testing.T) {
+	d := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "Generic SSD", Attrs: []smart.Attr{{ID: 0xE8, Value: 0}}}
+	got := Evaluate([]smart.Disk{d})
+	if len(got) != 1 || got[0].Severity != Critical || got[0].Current != "0%" {
+		t.Fatalf("unknown-vendor E8 at 0 = %+v, want one critical", got)
+	}
+}
+
 func TestPlextorE8LifeUsesModelScopedRule(t *testing.T) {
 	plextor := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "PLEXTOR PX-256M5Pro", Attrs: []smart.Attr{{ID: 0xE8, Value: 5}}}
 	got := Evaluate([]smart.Disk{plextor})

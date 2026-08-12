@@ -1,9 +1,6 @@
 package smart
 
 import (
-	"syscall"
-	"unsafe"
-
 	"golang.org/x/sys/windows"
 )
 
@@ -42,21 +39,6 @@ const (
 func toUTF16Ptr(s string) *uint16 {
 	p, _ := windows.UTF16PtrFromString(s)
 	return p
-}
-
-// readCStrings 以「偏移 N 处读取 UTF-16LE（偏移在头中给出）序列」的方式处理 Windows 存储描述符中的字符串字段。
-// 对于 STORAGE_DEVICE_DESCRIPTOR，字符串偏移在 SerialNumberOffset / ProductIdOffset / ProductRevisionOffset。
-// 这里给出一个安全的小工具：读取最大 max 字节的 NUL 结尾 UTF-16。
-func readUTF16(b []byte) string {
-	if len(b) == 0 || len(b)%2 != 0 {
-		return ""
-	}
-	u16 := unsafe.Slice((*uint16)(unsafe.Pointer(&b[0])), len(b)/2)
-	n := 0
-	for n < len(u16) && u16[n] != 0 {
-		n++
-	}
-	return syscall.UTF16ToString(u16[:n])
 }
 
 // openDevice 以读写+共享方式打开 \\.\PhysicalDriveN

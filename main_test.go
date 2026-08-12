@@ -17,7 +17,7 @@ func TestMergeFallbackDisksOnlyFillsMissingAttributes(t *testing.T) {
 		{Index: 2, Kind: smart.KindATA, Model: "Only WMI", Attrs: []smart.Attr{{ID: 9}}},
 	}
 
-	got := mergeFallbackDisks(primary, fallback)
+	got := smart.MergeFallbackDisks(primary, fallback)
 	if len(got) != 3 || got[0].Attrs[0].ID != 5 || got[1].Attrs[0].ID != 5 || got[2].Index != 2 {
 		t.Fatalf("unexpected merged disks: %+v", got)
 	}
@@ -39,7 +39,7 @@ func TestMergeFallbackDisksReplacesCorruptATASMARTData(t *testing.T) {
 		SMARTChecksumKnown: true, SMARTChecksumValid: true,
 	}}
 
-	got := mergeFallbackDisks(primary, fallback)
+	got := smart.MergeFallbackDisks(primary, fallback)
 	if len(got) != 1 || len(got[0].Attrs) != 1 || got[0].Attrs[0].ID != 5 || !got[0].SMARTChecksumValid {
 		t.Fatalf("expected valid fallback SMART data: %+v", got)
 	}
@@ -48,13 +48,13 @@ func TestMergeFallbackDisksReplacesCorruptATASMARTData(t *testing.T) {
 func TestMergeFallbackDisksKeepsSuccessfulTransport(t *testing.T) {
 	primary := []smart.Disk{{Index: 0, Kind: smart.KindATA, SMARTTransport: "ATA IOCTL", Attrs: []smart.Attr{{ID: 5}}}}
 	fallback := []smart.Disk{{Index: 0, Kind: smart.KindATA, SMARTTransport: "WMI fallback", Attrs: []smart.Attr{{ID: 1}}}}
-	got := mergeFallbackDisks(primary, fallback)
+	got := smart.MergeFallbackDisks(primary, fallback)
 	if got[0].SMARTTransport != "ATA IOCTL" || got[0].Attrs[0].ID != 5 {
 		t.Fatalf("valid native transport/data was replaced: %+v", got[0])
 	}
 
 	primary[0].Attrs = nil
-	got = mergeFallbackDisks(primary, fallback)
+	got = smart.MergeFallbackDisks(primary, fallback)
 	if got[0].SMARTTransport != "WMI fallback" || got[0].Attrs[0].ID != 1 {
 		t.Fatalf("fallback transport/data was not used: %+v", got[0])
 	}
@@ -63,7 +63,7 @@ func TestMergeFallbackDisksKeepsSuccessfulTransport(t *testing.T) {
 func TestMergeFallbackDisksCorrectsUnprobedUSBNVMeKind(t *testing.T) {
 	primary := []smart.Disk{{Index: 2, Kind: smart.KindATA, Model: "USB SSD", SMARTReadError: "ATA IOCTL failed"}}
 	fallback := []smart.Disk{{Index: 2, Kind: smart.KindNVMe, Model: "NVMe SSD USB Device", SMARTReadError: "WMI fallback does not expose an NVMe Health Log"}}
-	got := mergeFallbackDisks(primary, fallback)
+	got := smart.MergeFallbackDisks(primary, fallback)
 	if len(got) != 1 || got[0].Kind != smart.KindNVMe || got[0].SMARTReadError != fallback[0].SMARTReadError {
 		t.Fatalf("USB NVMe classification was not corrected: %+v", got)
 	}
