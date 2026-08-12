@@ -48,6 +48,10 @@ func main() {
 	}
 }
 
+// 单日/长期运行的日志上限：超过后把旧日志归档为 smonitor.log.old 再重写，
+// 避免 smonitor.log 无限增长。
+const maxLogBytes = 5 << 20 // 5 MB
+
 // openLogFile 优先在 exe 所在目录创建日志；不可写时回退到系统临时目录。
 // 返回的 *os.File 为 nil 时调用方应跳过日志输出（静默降级）。
 func openLogFile() (*os.File, error) {
@@ -55,12 +59,19 @@ func openLogFile() (*os.File, error) {
 	if exe, err := os.Executable(); err == nil {
 		dir = filepath.Dir(exe)
 	}
-	f, err := os.OpenFile(filepath.Join(dir, "smonitor.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err == nil {
+	if f, err := openLogWithRotation(filepath.Join(dir, "smonitor.log")); err == nil {
 		return f, nil
 	}
-	tmp := filepath.Join(os.TempDir(), "smonitor.log")
-	return os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	return openLogWithRotation(filepath.Join(os.TempDir(), "smonitor.log"))
+}
+
+// openLogWithRotation 若日志已超过 maxLogBytes 则先归档（smonitor.log.old，
+// 覆盖旧的归档），再以追加方式打开。归档失败不阻塞：继续打开原文件。
+func openLogWithRotation(path string) (*os.File, error) {
+	if fi, err := os.Stat(path); err == nil && fi.Size() > maxLogBytes {
+		_ = os.Rename(path, path+".old")
+	}
+	return os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 }
 
 // isAdmin checks the process token directly. Opening a physical drive is not a

@@ -53,7 +53,8 @@ del rsrc.syso
 ### 日志文件
 
 - 默认写入 exe 所在目录的 `smonitor.log`；
-- 若目录不可写（如放在 `Program Files` 下），自动回退到 `%TEMP%\smonitor.log`。
+- 若目录不可写（如放在 `Program Files` 下），自动回退到 `%TEMP%\smonitor.log`；
+- 超过 5 MB 时自动归档为 `smonitor.log.old` 并重写，避免无限增长。
 
 ## 采集方式
 

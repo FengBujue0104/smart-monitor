@@ -62,8 +62,13 @@ rem the ANSI codepage and non-ASCII text corrupts parsing.
 rem ============================================================
 :sign
 set "SIGNTOOL="
+rem Preferred exact versions first, then fall back to the newest installed
+rem Windows SDK kit, then PATH.
 if exist "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe" set "SIGNTOOL=C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe"
 if not defined SIGNTOOL if exist "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" set "SIGNTOOL=C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe"
+if not defined SIGNTOOL for /f "delims=" %%K in ('dir /b /o-n "C:\Program Files (x86)\Windows Kits\10\bin\10.0.*" 2^>nul') do (
+    if not defined SIGNTOOL if exist "C:\Program Files (x86)\Windows Kits\10\bin\%%K\x64\signtool.exe" set "SIGNTOOL=C:\Program Files (x86)\Windows Kits\10\bin\%%K\x64\signtool.exe"
+)
 if not defined SIGNTOOL for /f "delims=" %%S in ('where signtool 2^>nul') do if not defined SIGNTOOL set "SIGNTOOL=%%S"
 if not defined SIGNTOOL (
     echo   [sign] signtool.exe not found; install Windows SDK.

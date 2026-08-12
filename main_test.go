@@ -1,10 +1,52 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"smonitor/smart"
 )
+
+// 日志超过上限时归档为 .old 再重写；小日志不归档。
+func TestOpenLogWithRotationArchivesOversizedLog(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "smonitor.log")
+
+	// 超过 5MB 的旧日志 → 归档为 .old，新文件从空开始
+	big := make([]byte, maxLogBytes+1)
+	if err := os.WriteFile(path, big, 0644); err != nil {
+		t.Fatal(err)
+	}
+	f, err := openLogWithRotation(path)
+	if err != nil {
+		t.Fatalf("open oversized log: %v", err)
+	}
+	f.Close()
+	if _, err := os.Stat(path + ".old"); err != nil {
+		t.Fatalf("oversized log was not archived: %v", err)
+	}
+	if fi, err := os.Stat(path); err != nil || fi.Size() != 0 {
+		t.Fatalf("new log should start empty: size=%v err=%v", fi.Size(), err)
+	}
+
+	// 小日志 → 不归档，追加保持
+	os.Remove(path + ".old")
+	if err := os.WriteFile(path, []byte("small"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	f, err = openLogWithRotation(path)
+	if err != nil {
+		t.Fatalf("open small log: %v", err)
+	}
+	f.Close()
+	if _, err := os.Stat(path + ".old"); !os.IsNotExist(err) {
+		t.Fatalf("small log must not be archived: %v", err)
+	}
+	if fi, _ := os.Stat(path); fi.Size() != 5 {
+		t.Fatalf("small log was truncated: size=%d", fi.Size())
+	}
+}
 
 func TestMergeFallbackDisksOnlyFillsMissingAttributes(t *testing.T) {
 	primary := []smart.Disk{
