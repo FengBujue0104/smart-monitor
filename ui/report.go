@@ -46,11 +46,6 @@ func discoverAsync(discover func() ([]smart.Disk, error)) <-chan discoveryResult
 	return result
 }
 
-// RunReport 显示报表。异常统一显示在主窗口横幅和表格中，不创建第二个告警窗口。
-func RunReport(disks []smart.Disk, violations []health.Violation) error {
-	return RunReportWithStatus(disks, violations, "")
-}
-
 // RunReportWithStatus displays an initial operational status in the main
 // window. It is used for startup failures so the application never needs a
 // blocking alert dialog to tell the user what happened.
@@ -565,9 +560,13 @@ func unreadSMARTCount(disks []smart.Disk) int {
 	return count
 }
 
-// unreadSMARTDetails gives the main-window banner concise, actionable reasons
-// for unavailable SMART data. Keeping this in the banner lets users verify a
-// USB/RAID compatibility result without horizontally scrolling the table.
+// banner 折叠：违规/未读明细可能非常多（几十块盘×多条违规），全列出会把
+// 表格挤出窗口。超出上限的行折叠为一句提示，完整列表在表格与复制报表中。
+const (
+	maxBannerViolationLines = 6
+	maxBannerUnreadLines    = 3
+)
+
 func unreadSMARTDetails(disks []smart.Disk) []string {
 	var details []string
 	for _, d := range disks {
@@ -579,6 +578,11 @@ func unreadSMARTDetails(disks []smart.Disk) []string {
 			reason = append(reason[:119], '…')
 		}
 		details = append(details, fmt.Sprintf("  Disk%d: %s", d.Index, string(reason)))
+	}
+	if len(details) > maxBannerUnreadLines {
+		extra := len(details) - maxBannerUnreadLines
+		details = details[:maxBannerUnreadLines]
+		details = append(details, fmt.Sprintf("  …及另外 %d 块磁盘，详见下方表格", extra))
 	}
 	return details
 }
@@ -609,13 +613,22 @@ func alertBannerText(disks []smart.Disk, vs []health.Violation) string {
 		return "✅ 所有监测的 SMART 指标均处于安全范围"
 	}
 	var lines []string
+	shown, extra := 0, 0
 	for _, v := range vs {
+		if shown >= maxBannerViolationLines {
+			extra++
+			continue
+		}
 		mark := "⚠️"
 		if v.Severity == "critical" {
 			mark = "❌"
 		}
 		lines = append(lines, fmt.Sprintf("  %s [Disk%d] %s: %s (阈值 %s)",
 			mark, v.DiskIndex, v.AttrName, v.Current, v.Limit))
+		shown++
+	}
+	if extra > 0 {
+		lines = append(lines, fmt.Sprintf("  …及另外 %d 项异常，详见下方表格", extra))
 	}
 	if unread := unreadSMARTCount(disks); unread > 0 {
 		lines = append(lines, fmt.Sprintf("  ⚠️ %d 块磁盘未读取到 SMART 数据", unread))

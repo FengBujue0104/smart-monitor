@@ -243,6 +243,33 @@ func TestAlertBannerShowsSMARTReadFailureReason(t *testing.T) {
 	}
 }
 
+// 多盘/多违规时横幅只列出前几条并给出折叠提示，避免把表格挤出窗口。
+func TestAlertBannerFoldsExcessiveDetails(t *testing.T) {
+	var vs []health.Violation
+	for i := 0; i < maxBannerViolationLines+3; i++ {
+		vs = append(vs, health.Violation{
+			DiskIndex: 0, AttrName: "Fake_Error", Current: "1", Limit: "= 0", Severity: health.Critical,
+		})
+	}
+	got := alertBannerText([]smart.Disk{{Index: 0, Kind: smart.KindATA, Attrs: []smart.Attr{{ID: 0x05}}}}, vs)
+	lines := strings.Split(strings.TrimSpace(got), "\n")
+	if len(lines) != maxBannerViolationLines+1 {
+		t.Fatalf("banner lines = %d, want %d folded: %q", len(lines), maxBannerViolationLines+1, got)
+	}
+	if !strings.Contains(got, "及另外 3 项异常") {
+		t.Fatalf("banner lacks fold hint: %q", got)
+	}
+
+	var unread []smart.Disk
+	for i := 0; i < maxBannerUnreadLines+2; i++ {
+		unread = append(unread, smart.Disk{Index: i, Kind: smart.KindATA, SMARTReadError: "probe failed"})
+	}
+	got = alertBannerText(unread, nil)
+	if !strings.Contains(got, "及另外 2 块磁盘") {
+		t.Fatalf("unread banner lacks fold hint: %q", got)
+	}
+}
+
 func TestReportBannerShowsStartupStatusWithoutDialog(t *testing.T) {
 	// status 非空时只显示状态文本，不附加“未发现支持 SMART”等会在扫描中
 	// 误导用户的噪音行；颜色用橙色提示而非红色告警。
