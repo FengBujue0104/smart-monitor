@@ -20,6 +20,8 @@ type ReportWin struct {
 	tv         *walk.TableView
 	banner     *walk.Label
 	stampLbl   *walk.Label
+	copyBtn    *walk.PushButton
+	simBtn     *walk.PushButton
 	rescanBtn  *walk.PushButton
 	rescanning bool
 }
@@ -126,11 +128,13 @@ func createReportWindow(rw *ReportWin, model *reportModel, status string) (*Repo
 				Layout: HBox{MarginsZero: true},
 				Children: []Widget{
 					PushButton{
+						AssignTo:  &rw.copyBtn,
 						Text:      "复制异常条目",
 						MinSize:   Size{Width: 140, Height: 30},
 						OnClicked: func() { rw.copyReport() },
 					},
 					PushButton{
+						AssignTo:  &rw.simBtn,
 						Text:      "模拟异常验证",
 						MinSize:   Size{Width: 120, Height: 30},
 						OnClicked: func() { rw.simulateFailures() },
@@ -653,6 +657,12 @@ func alertBannerColor(disks []smart.Disk, vs []health.Violation) walk.Color {
 // ===== 行为 =====
 
 func (rw *ReportWin) copyReport() {
+	// 扫描未完成时 disks 仍为空，复制会得到“未检测到异常”的假结论；
+	// 按钮已在扫描期间禁用，这里再加一层防御。
+	if rw.disks == nil {
+		rw.showStatus("扫描尚未完成，请稍候再复制。", walk.RGB(0xB0, 0x60, 0x00))
+		return
+	}
 	rpt := buildExceptionReport(rw.disks, rw.violations)
 	if err := WriteText(rpt); err != nil {
 		rw.showStatus("复制失败："+err.Error(), walk.RGB(0xB0, 0x20, 0x20))
@@ -677,9 +687,7 @@ func (rw *ReportWin) rescanWith(discover func() ([]smart.Disk, error)) {
 		return
 	}
 	rw.rescanning = true
-	if rw.rescanBtn != nil {
-		rw.rescanBtn.SetEnabled(false)
-	}
+	rw.setActionsEnabled(false)
 	rw.showStatus("正在扫描磁盘，请稍候…", walk.RGB(0xB0, 0x60, 0x00))
 
 	// SMART IOCTL and WMI probing can take noticeable time on USB/RAID
@@ -694,18 +702,14 @@ func (rw *ReportWin) rescanWith(discover func() ([]smart.Disk, error)) {
 			if r := recover(); r != nil {
 				rw.Synchronize(func() {
 					rw.rescanning = false
-					if rw.rescanBtn != nil {
-						rw.rescanBtn.SetEnabled(true)
-					}
+					rw.setActionsEnabled(true)
 					rw.showStatus("扫描异常："+fmt.Sprintf("%v", r), walk.RGB(0xB0, 0x20, 0x20))
 				})
 			}
 		}()
 		rw.Synchronize(func() {
 			rw.rescanning = false
-			if rw.rescanBtn != nil {
-				rw.rescanBtn.SetEnabled(true)
-			}
+			rw.setActionsEnabled(true)
 			switch {
 			case outcome.err != nil:
 				rw.showStatus("扫描失败："+outcome.err.Error(), walk.RGB(0xB0, 0x20, 0x20))
@@ -741,6 +745,16 @@ func (rw *ReportWin) showStatus(message string, color walk.Color) {
 	}
 	_ = rw.banner.SetText(text)
 	rw.banner.SetTextColor(color)
+}
+
+// setActionsEnabled 在扫描期间禁用所有操作按钮。扫描未完成时“复制异常条目”
+// 会复制出“未检测到异常”的假结论，“重新扫描”/“模拟异常验证”也不该并发触发。
+func (rw *ReportWin) setActionsEnabled(enabled bool) {
+	for _, b := range []*walk.PushButton{rw.copyBtn, rw.simBtn, rw.rescanBtn} {
+		if b != nil {
+			b.SetEnabled(enabled)
+		}
+	}
 }
 
 func (rw *ReportWin) setReportData(disks []smart.Disk) error {
