@@ -34,12 +34,21 @@ Windows 10/11 兼容、单 .exe 分发。读取物理硬盘的 S.M.A.R.T 属性�
 
 > 注：签名只消除 SmartScreen"未知发布者"提示。要让 Windows 完全信任，证书须由受信任的公共 CA（如 DigiCert、GlobalSign、Let's Encrypt 不支持代码签名）签发；自签名或测试证书仅用于内部验证。
 
-### 测试（需要管理员权限）
+### 测试（默认无需管理员）
 
-`rsrc/app.manifest` 声明 `requireAdministrator`，所有可执行产物（含测试二进制）都会触发 UAC 提权。因此在普通终端里 `go test .`（主包）会报 `The requested operation requires elevation`：
+主包测试（`simulation_test.go` 的模拟异常）只操作内存数据，不读真实磁盘，普通终端即可运行：
 
-- 在**管理员** PowerShell / 终端中运行 `go test ./...`（或 `go test -run TestSimulatedDiskFailuresProduceFeedbackReport -v .`）；
-- `./health/ ./smart/ ./ui/` 三个子包不读真实磁盘，任意权限下都能跑。
+```powershell
+go test ./...
+```
+
+唯一例外：若你本机用 `build.bat` 构建过且残留了 `rsrc.syso`，该文件会让测试二进制也带上 `requireAdministrator` manifest，此时 `go test .` 会报 `The requested operation requires elevation`。`build.bat` 现在构建完会自动删除 `rsrc.syso`；老残留可手动删除：
+
+```powershell
+del rsrc.syso
+```
+
+`./health/ ./smart/ ./ui/` 三个子包不读真实磁盘，任何权限下都能跑。
 
 ### 日志文件
 
@@ -95,12 +104,13 @@ Windows 10/11 兼容、单 .exe 分发。读取物理硬盘的 S.M.A.R.T 属性�
 |---|---|---|
 | Media_Data_Integrity_Errors ("0E") | != 0 | 严重 |
 | Percentage_Used | 已用 > 50%（剩余寿命 < 50%） | 严重 |
-| Temperature | > 60°C | 严重 |
-| Temperature Sensor 1–8 | > 60°C | 严重 |
+| Temperature（复合温度） | > 60°C | 严重 |
 | Critical_Warning | != 0 | 严重 |
 | Endurance_Group_Critical_Warning_Summary | != 0 | 严重 |
 | Available_Spare < Threshold | | 严重 |
 | Read_Only_Mode | != 0 | 严重 |
+
+> 注：Temperature Sensor 1–8 是厂商自定义位置（控制器/NAND/PCB 等），NVMe 规范没有通用阈值，**仅展示不告警**（告警依据复合温度与 Critical Warning），避免误报。
 
 ATA SMART 数据页校验和异常会作为数据完整性警告显示，并触发 WMI 回退；不会被当作“健康”。
 

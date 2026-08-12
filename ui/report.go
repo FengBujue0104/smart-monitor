@@ -88,9 +88,10 @@ func createReportWindow(rw *ReportWin, model *reportModel, status string) (*Repo
 	err := MainWindow{
 		AssignTo: &rw.MainWindow,
 		Title:    "S.M.A.R.T 健康检查报告",
-		MinSize:  Size{Width: 900, Height: 560},
-		Size:     Size{Width: 1000, Height: 640},
-		Layout:   VBox{Margins: Margins{Left: 8, Top: 8, Right: 8, Bottom: 8}},
+		// 11 列总宽约 1270px，默认窗口放大到能一屏容纳，避免用户横向滚动。
+		MinSize: Size{Width: 900, Height: 560},
+		Size:    Size{Width: 1320, Height: 700},
+		Layout:  VBox{Margins: Margins{Left: 8, Top: 8, Right: 8, Bottom: 8}},
 		Children: []Widget{
 			Label{
 				AssignTo:  &rw.banner,

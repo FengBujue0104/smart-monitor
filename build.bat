@@ -38,10 +38,16 @@ echo [3/4] Signing...
 call :sign
 if errorlevel 1 echo   [sign] skipped: no code-signing certificate found.
 
+rem Remove the intermediate resource object. smonitor.exe already embeds the
+rem manifest, and a leftover rsrc.syso makes every later `go test .` link the
+rem requireAdministrator manifest into the test binary (UAC elevation prompt).
+if exist "%~dp0rsrc.syso" del /q "%~dp0rsrc.syso"
+
 for %%A in (smonitor.exe) do echo [4/4] Done: %%~zA bytes
 exit /b 0
 
 :err
+if exist "%~dp0rsrc.syso" del /q "%~dp0rsrc.syso"
 echo Build failed.
 exit /b 1
 
