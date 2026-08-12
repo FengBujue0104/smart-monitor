@@ -421,13 +421,7 @@ func attrRawStr(a smart.Attr) string {
 		}
 	}
 	if a.ID == 0xC2 || a.ID == 0xB9 || a.ID == 0xBE {
-		current := a.Raw & 0xFF
-		minimum := (a.Raw >> 8) & 0xFF
-		maximum := (a.Raw >> 16) & 0xFF
-		if minimum != 0 || maximum != 0 {
-			return fmt.Sprintf("%d°C (min %d°C, max %d°C)", current, minimum, maximum)
-		}
-		return fmt.Sprintf("%d°C (raw %d)", current, a.Raw)
+		return ataTempDisplayStr(a.Raw)
 	}
 	if a.ID == 0x09 {
 		return fmt.Sprintf("%d h", a.Raw)
@@ -438,18 +432,26 @@ func attrRawStr(a smart.Attr) string {
 	return fmt.Sprintf("%d", a.Raw)
 }
 
+// ataTempDisplayStr 格式化 ATA 温度属性的 raw。raw 低字节是当前温度；
+// 字节 1/2 是厂牌特定的 min/max（仅当数值自洽时才展开）。KIOXIA 等布局
+// 不同的盘或只有单字节的盘只显示当前温度，避免 "min 0°C, max 19°C" 或
+// 附上 48 位巨数 raw 的荒谬展示。
+func ataTempDisplayStr(raw uint64) string {
+	current := int(raw & 0xFF)
+	minimum := int((raw >> 8) & 0xFF)
+	maximum := int((raw >> 16) & 0xFF)
+	if minimum > 0 && maximum > 0 && minimum <= current && current <= maximum {
+		return fmt.Sprintf("%d°C (min %d°C, max %d°C)", current, minimum, maximum)
+	}
+	return fmt.Sprintf("%d°C", current)
+}
+
 // attrRawStrForModel applies only the vendor/unit mappings verified against
 // CrystalDiskInfo reports. Unknown models retain the generic raw display.
 func attrRawStrForModel(model string, a smart.Attr) string {
 	if a.Kind == "ata" {
 		if smart.ATATemperatureAttributeForModel(model, a.ID) {
-			current := a.Raw & 0xFF
-			minimum := (a.Raw >> 8) & 0xFF
-			maximum := (a.Raw >> 16) & 0xFF
-			if minimum != 0 || maximum != 0 {
-				return fmt.Sprintf("%d°C (min %d°C, max %d°C)", current, minimum, maximum)
-			}
-			return fmt.Sprintf("%d°C (raw %d)", current, a.Raw)
+			return ataTempDisplayStr(a.Raw)
 		}
 		if unit, ok := smart.ATACounterUnitForModel(model, a.ID); ok {
 			switch unit {

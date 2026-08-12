@@ -12,8 +12,10 @@ import (
 )
 
 func TestAttrDisplaySeparatesRawAndNormalizedValues(t *testing.T) {
+	// min 48°C > current 42°C，不自洽 → 只显示当前温度（旧逻辑会展开出
+	// 荒谬的 "min 48°C, max 70°C"）。
 	ataTemp := smart.Attr{ID: 0xC2, Raw: 0x46302A, Value: 100, Worst: 90, Kind: "ata"}
-	if got := attrRawStr(ataTemp); got != "42°C (min 48°C, max 70°C)" {
+	if got := attrRawStr(ataTemp); got != "42°C" {
 		t.Fatalf("unexpected ATA raw display: %q", got)
 	}
 	if got := attrFlagsStr(smart.Attr{Flags: 0x35, Kind: "ata"}); got != "0x0035" {
@@ -83,7 +85,7 @@ func TestAttrDisplaySeparatesRawAndNormalizedValues(t *testing.T) {
 	if got := attrRawStrForModel("Micron M600 SATA 256GB", smart.Attr{ID: 0xF2, Raw: 2097152, Kind: "ata"}); got != "1.00 GiB (2097152 × 512 B)" {
 		t.Fatalf("unexpected Micron M600 host reads display: %q", got)
 	}
-	if got := attrRawStrForModel("ZHITAI TiPlus5000", smart.Attr{ID: 0xF3, Raw: 0x46302A, Kind: "ata"}); got != "42°C (min 48°C, max 70°C)" {
+	if got := attrRawStrForModel("ZHITAI TiPlus5000", smart.Attr{ID: 0xF3, Raw: 0x46302A, Kind: "ata"}); got != "42°C" {
 		t.Fatalf("unexpected YMTC F3 temperature display: %q", got)
 	}
 	if got := attrRawStrForModel("ZHITAI TiPlus5000", smart.Attr{ID: 0xF1, Raw: 2097152, Kind: "ata"}); got != "1.00 GiB (2097152 × 512 B)" {
@@ -152,11 +154,20 @@ func TestAttrRawStrForModelShowsKioxiaAndWDUnits(t *testing.T) {
 	}
 }
 
-// 温度属性展开当前/最低/最高（raw 低三字节），未知型号的普通计数保持原样。
+// 温度属性：raw 低字节为当前温度；字节 1/2 的 min/max 仅在自洽时展开
+// （min≤当前≤max 且均非零）。KIOXIA 等布局不同的盘只显示当前温度。
 func TestAttrRawStrForModelShowsTemperatureAndFallsBackToRaw(t *testing.T) {
-	// C2 raw 低三字节：byte0=当前(0x23=35)、byte1=最低(0x00)、byte2=最高(0x14=20)
-	if got := attrRawStrForModel("Generic HDD", smart.Attr{ID: 0xC2, Raw: 0x002800140023, Kind: "ata"}); got != "35°C (min 0°C, max 20°C)" {
+	// WD 型 raw：当前 35°C、min 20°C、max 40°C（byte0/1/2），自洽 → 展开
+	if got := attrRawStrForModel("Generic HDD", smart.Attr{ID: 0xC2, Raw: 0x00281423, Kind: "ata"}); got != "35°C (min 20°C, max 40°C)" {
 		t.Fatalf("C2 min/max display = %q", got)
+	}
+	// KIOXIA 型 raw：当前 34°C、byte1=0 → 只显示当前温度，不展开荒谬的 min/max
+	if got := attrRawStrForModel("KIOXIA-EXCERIA SATA SSD", smart.Attr{ID: 0xC2, Raw: 0x2C00130022, Kind: "ata"}); got != "34°C" {
+		t.Fatalf("KIOXIA C2 display = %q", got)
+	}
+	// 单字节 raw（只有当前温度）
+	if got := attrRawStrForModel("Generic HDD", smart.Attr{ID: 0xC2, Raw: 61, Kind: "ata"}); got != "61°C" {
+		t.Fatalf("single-byte C2 display = %q", got)
 	}
 	// 未知型号的 F1 不做单位换算，显示原始值
 	if got := attrRawStrForModel("Generic SSD", smart.Attr{ID: 0xF1, Raw: 999, Kind: "ata"}); got != "999" {
