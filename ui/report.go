@@ -15,17 +15,18 @@ import (
 // ReportWin 主报表窗口
 type ReportWin struct {
 	*walk.MainWindow
-	disks      []smart.Disk
-	violations []health.Violation
-	tv         *walk.TableView
-	banner     *walk.Label
-	stampLbl   *walk.Label
-	copyBtn    *walk.PushButton
-	simBtn     *walk.PushButton
-	rescanBtn  *walk.PushButton
-	rescanning bool
-	closed     bool     // 窗口已关闭：扫描完成回调不得再触碰已销毁的控件
-	lastTitle  string   // 上次设置的标题，用于“新出现严重告警”时蜂鸣一次
+	disks       []smart.Disk
+	violations  []health.Violation
+	tv          *walk.TableView
+	banner      *walk.Label
+	stampLbl    *walk.Label
+	copyBtn     *walk.PushButton
+	copyFullBtn *walk.PushButton
+	simBtn      *walk.PushButton
+	rescanBtn   *walk.PushButton
+	rescanning  bool
+	closed      bool   // 窗口已关闭：扫描完成回调不得再触碰已销毁的控件
+	lastTitle   string // 上次设置的标题，用于“新出现严重告警”时蜂鸣一次
 }
 
 type discoveryResult struct {
@@ -140,6 +141,12 @@ func createReportWindow(rw *ReportWin, model *reportModel, status string) (*Repo
 						Text:      "复制异常条目",
 						MinSize:   Size{Width: 140, Height: 30},
 						OnClicked: func() { rw.copyReport() },
+					},
+					PushButton{
+						AssignTo:  &rw.copyFullBtn,
+						Text:      "复制完整报告",
+						MinSize:   Size{Width: 130, Height: 30},
+						OnClicked: func() { rw.copyFullReport() },
 					},
 					PushButton{
 						AssignTo:  &rw.simBtn,
@@ -688,6 +695,20 @@ func (rw *ReportWin) copyReport() {
 	rw.showStatus(message, walk.RGB(0x1B, 0x7A, 0x2F))
 }
 
+// copyFullReport 复制包含全部磁盘与属性的完整文本报表（适合留存快照）。
+func (rw *ReportWin) copyFullReport() {
+	if rw.disks == nil {
+		rw.showStatus("扫描尚未完成，请稍候再复制。", walk.RGB(0xB0, 0x60, 0x00))
+		return
+	}
+	rpt := buildTextReport(rw.disks, rw.violations)
+	if err := WriteText(rpt); err != nil {
+		rw.showStatus("复制失败："+err.Error(), walk.RGB(0xB0, 0x20, 0x20))
+		return
+	}
+	rw.showStatus("完整报告已复制到剪贴板。", walk.RGB(0x1B, 0x7A, 0x2F))
+}
+
 func (rw *ReportWin) rescan() {
 	rw.rescanWith(smart.DiscoverWithFallback)
 }
@@ -769,7 +790,7 @@ func (rw *ReportWin) showStatus(message string, color walk.Color) {
 // setActionsEnabled 在扫描期间禁用所有操作按钮。扫描未完成时“复制异常条目”
 // 会复制出“未检测到异常”的假结论，“重新扫描”/“模拟异常验证”也不该并发触发。
 func (rw *ReportWin) setActionsEnabled(enabled bool) {
-	for _, b := range []*walk.PushButton{rw.copyBtn, rw.simBtn, rw.rescanBtn} {
+	for _, b := range []*walk.PushButton{rw.copyBtn, rw.copyFullBtn, rw.simBtn, rw.rescanBtn} {
 		if b != nil {
 			b.SetEnabled(enabled)
 		}
