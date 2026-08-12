@@ -214,14 +214,15 @@ func evaluateATA(d smart.Disk) []Violation {
 				add(a, Warning, its(a.Value)+"%", "> 50%")
 			}
 		case 0xAD, 0xB1: // Wear_Leveling_Count
-			if a.ID == 0xB1 {
-				// Samsung B1 归一化值=剩余寿命；用户要求低于 50% 即红色告警。
-				if life, ok := smart.ATAHealthPercentForModel(d.Model, []smart.Attr{a}); ok {
-					if life < 50 {
-						add(a, Critical, its(life)+"% (remaining)", "≥ 50%")
-					}
-					break
+			// 0xAD 对 KIOXIA 等厂牌是剩余寿命字段（剩余=Value-100），
+			// 0xB1 对 Samsung 是剩余寿命。有 model-scoped 寿命语义的盘
+			// 优先走“剩余寿命<50%”规则；其余盘（0xAD 擦除计数等）退回
+			// 设备阈值判断。
+			if life, ok := smart.ATAHealthPercentForModel(d.Model, []smart.Attr{a}); ok {
+				if life < 50 {
+					add(a, Critical, its(life)+"% (remaining)", "≥ 50%")
 				}
+				break
 			}
 			// 低归一化值提示磨损（0xAD 擦除计数）
 			if a.Thresh > 0 && a.Value <= a.Thresh {

@@ -193,6 +193,39 @@ func TestUnknownVendorE8ZeroValueIsCritical(t *testing.T) {
 	}
 }
 
+// KIOXIA 0xAD 是剩余寿命字段（剩余=Value-100，Value 100~200 映射 0%~100%）。
+// 旧代码 0xAD 分支从不调用 model-scoped 寿命规则，KIOXIA 寿命告警从未生效；
+// 且 kioxiaRemainingHealth 用 `life > 0` 漏掉 0% 耗尽。
+func TestKioxiaADLifeFollowsRemainingLifeRule(t *testing.T) {
+	for _, test := range []struct {
+		value    int
+		want     int
+		severity Severity
+		current  string
+	}{
+		{value: 196, want: 0},                                  // 96% remaining（真盘报告值）
+		{value: 151, want: 0},                                  // 51% remaining
+		{value: 149, want: 1, severity: Critical, current: "49% (remaining)"},
+		{value: 100, want: 1, severity: Critical, current: "0% (remaining)"},
+	} {
+		d := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "KIOXIA-EXCERIA SATA SSD", Attrs: []smart.Attr{{ID: 0xAD, Value: test.value}}}
+		got := Evaluate([]smart.Disk{d})
+		if len(got) != test.want {
+			t.Fatalf("KIOXIA AD value=%d: got %d violations, want %d (%+v)", test.value, len(got), test.want, got)
+		}
+		if test.want > 0 && (got[0].Severity != test.severity || got[0].Current != test.current) {
+			t.Fatalf("KIOXIA AD value=%d: got %+v", test.value, got[0])
+		}
+	}
+
+	// 非 KIOXIA 的 0xAD（无剩余寿命语义）不受影响：仅按设备阈值报磨损。
+	wdc := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "WDC WD10EZEX-00BN5A0", Attrs: []smart.Attr{{ID: 0xAD, Value: 10, Thresh: 10, Flags: 0x0002}}}
+	got := Evaluate([]smart.Disk{wdc})
+	if len(got) != 1 || got[0].Severity != Warning || got[0].Current != "10" {
+		t.Fatalf("non-KIOXIA AD must keep the threshold rule: %+v", got)
+	}
+}
+
 func TestPlextorE8LifeUsesModelScopedRule(t *testing.T) {
 	plextor := smart.Disk{Index: 0, Kind: smart.KindATA, Model: "PLEXTOR PX-256M5Pro", Attrs: []smart.Attr{{ID: 0xE8, Value: 5}}}
 	got := Evaluate([]smart.Disk{plextor})

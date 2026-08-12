@@ -47,7 +47,9 @@ func kioxiaRemainingHealth(attrs []Attr) (int, bool) {
 		return 0, false
 	}
 	life := a.Value - 100
-	return life, life > 0 && life <= 100
+	// 剩余寿命=Value-100（Value 100~200 → 0%~100%）。life==0（Value=100）
+	// 表示耗尽，必须返回 true 才能触发告警；只有 Value<100 的异常数据才跳过。
+	return life, life >= 0 && life <= 100
 }
 
 func wdBlueSA510RemainingHealth(attrs []Attr) (int, bool) {
