@@ -225,6 +225,18 @@ func TestTextReportDoesNotClaimHealthyWhenSMARTIsUnavailable(t *testing.T) {
 	}
 }
 
+// 完整报告必须包含未读取盘的具体失败原因（与 GUI 表格一致），
+// 否则复制出的快照会丢失诊断信息。
+func TestTextReportIncludesSMARTReadErrorReason(t *testing.T) {
+	report := buildTextReport([]smart.Disk{{
+		Index: 2, Kind: smart.KindNVMe, Model: "USB NVMe",
+		SMARTReadError: "NVMe Health Log: access denied",
+	}}, nil)
+	if !strings.Contains(report, "access denied") {
+		t.Fatalf("text report lacks SMART read error reason: %q", report)
+	}
+}
+
 func TestReportModelShowsDiskLevelSMARTDiagnostics(t *testing.T) {
 	m := &reportModel{
 		disks: []smart.Disk{{Index: 3, Kind: smart.KindATA, Model: "Failed", Attrs: []smart.Attr{{ID: 5}}}},

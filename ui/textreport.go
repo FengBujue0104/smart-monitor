@@ -69,7 +69,11 @@ func buildTextReport(disks []smart.Disk, vs []health.Violation) string {
 			if d.Kind == smart.KindUnknown {
 				b.WriteString("  (该总线类型不提供 SMART 数据)\n\n")
 			} else {
-				b.WriteString("  (未读取到 SMART 属性)\n\n")
+				b.WriteString("  (未读取到 SMART 属性)")
+				if d.SMARTReadError != "" {
+					b.WriteString("  原因: " + d.SMARTReadError)
+				}
+				b.WriteString("\n\n")
 			}
 			continue
 		}
