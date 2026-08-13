@@ -78,13 +78,13 @@ func buildTextReport(disks []smart.Disk, vs []health.Violation) string {
 			continue
 		}
 		for _, a := range d.Attrs {
-			mark := "✅"
+			mark := "      "
 			for _, v := range vs {
 				if v.DiskIndex == d.Index && v.AttrID == a.ID {
 					if v.Severity == "critical" {
-						mark = "❌"
+						mark = "[严重]"
 					} else {
-						mark = "⚠️"
+						mark = "[警告]"
 					}
 					break
 				}
@@ -98,9 +98,9 @@ func buildTextReport(disks []smart.Disk, vs []health.Violation) string {
 	if len(vs) > 0 {
 		b.WriteString("====== 告警汇总 ======\n")
 		for _, v := range vs {
-			mark := "⚠️ 警告"
+			mark := "[警告]"
 			if v.Severity == "critical" {
-				mark = "❌ 严重"
+				mark = "[严重]"
 			}
 			b.WriteString(fmt.Sprintf("  %s [Disk%d] %s: %s (阈值 %s)\n",
 				mark, v.DiskIndex, v.AttrName, v.Current, v.Limit))

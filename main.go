@@ -25,7 +25,7 @@ func main() {
 
 	// 检查管理员权限（SMART IOCTL 必需）
 	if !isAdmin() {
-		if err := ui.RunReportWithStatus(nil, nil, "⚠ 未以管理员身份运行，无法读取硬盘 S.M.A.R.T 数据。请退出后右键选择“以管理员身份运行”。"); err != nil {
+		if err := ui.RunReportWithStatus(nil, nil, "未以管理员身份运行，无法读取硬盘 S.M.A.R.T 数据。请退出后右键选择“以管理员身份运行”。"); err != nil {
 			log.Printf("UI error: %v", err)
 		}
 		return

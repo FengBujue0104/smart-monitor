@@ -259,10 +259,10 @@ func TestReportModelShowsDiskLevelSMARTDiagnostics(t *testing.T) {
 	if got := m.RowCount(); got != 3 {
 		t.Fatalf("row count = %d, want 3", got)
 	}
-	if got := m.Value(0, 4); got != "SMART_Overall_Health" || m.Value(0, 10) != "❌ 严重" {
+	if got := m.Value(0, 4); got != "SMART_Overall_Health" || m.Value(0, 10) != "严重" {
 		t.Fatalf("unexpected overall diagnostic row: name=%q status=%q", got, m.Value(0, 10))
 	}
-	if got := m.Value(1, 2); got != "-" || m.Value(1, 4) != "SMART_Data_Checksum" || m.Value(1, 10) != "⚠️ 警告" {
+	if got := m.Value(1, 2); got != "-" || m.Value(1, 4) != "SMART_Data_Checksum" || m.Value(1, 10) != "警告" {
 		t.Fatalf("unexpected checksum diagnostic row: id=%q name=%q status=%q", got, m.Value(1, 4), m.Value(1, 10))
 	}
 }
@@ -275,13 +275,13 @@ func TestReportTitleReflectsHealthState(t *testing.T) {
 		}
 		return vs
 	}
-	if got := reportTitle(nil); !strings.Contains(got, "✅") {
+	if got := reportTitle(nil); got != "S.M.A.R.T 健康检查报告" {
 		t.Fatalf("healthy title = %q", got)
 	}
-	if got := reportTitle(mk(health.Warning, 2)); !strings.Contains(got, "⚠️") || !strings.Contains(got, "2 项警告") {
+	if got := reportTitle(mk(health.Warning, 2)); !strings.Contains(got, "2 项警告") {
 		t.Fatalf("warning title = %q", got)
 	}
-	if got := reportTitle(mk(health.Critical, 1)); !strings.Contains(got, "❌") || !strings.Contains(got, "1 项严重告警") {
+	if got := reportTitle(mk(health.Critical, 1)); !strings.Contains(got, "1 项严重告警") {
 		t.Fatalf("critical title = %q", got)
 	}
 	// 混合时优先严重告警

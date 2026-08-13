@@ -15,18 +15,18 @@ import (
 // ReportWin 主报表窗口
 type ReportWin struct {
 	*walk.MainWindow
-	disks       []smart.Disk
-	violations  []health.Violation
-	tv          *walk.TableView
-	banner      *walk.Label
-	stampLbl    *walk.Label
-	copyBtn     *walk.PushButton
-	copyFullBtn *walk.PushButton
-	simBtn      *walk.PushButton
-	rescanBtn   *walk.PushButton
-	rescanning  bool
-	closed      bool   // 窗口已关闭：扫描完成回调不得再触碰已销毁的控件
-	lastTitle   string // 上次设置的标题，用于“新出现严重告警”时蜂鸣一次
+	disks           []smart.Disk
+	violations      []health.Violation
+	tv              *walk.TableView
+	banner          *walk.Label
+	stampLbl        *walk.Label
+	copyBtn         *walk.PushButton
+	copyFullBtn     *walk.PushButton
+	simBtn          *walk.PushButton
+	rescanBtn       *walk.PushButton
+	rescanning      bool
+	closed          bool // 窗口已关闭：扫描完成回调不得再触碰已销毁的控件
+	lastHadCritical bool // 上次是否已有严重告警，用于“新出现严重告警”时蜂鸣一次
 }
 
 type discoveryResult struct {
@@ -260,9 +260,9 @@ func (m *reportModel) build() {
 			})
 		}
 		if len(d.Attrs) == 0 {
-			name, status := "SMART 数据未读取", "❔ 未读取"
+			name, status := "SMART 数据未读取", "未读取"
 			if d.Kind == smart.KindUnknown {
-				name, status = "SMART 不适用", "— 不适用"
+				name, status = "SMART 不适用", "不适用"
 			}
 			current := "-"
 			if d.SMARTReadError != "" {
@@ -309,11 +309,11 @@ func (m *reportModel) build() {
 func statusForSeverity(severity string) string {
 	switch severity {
 	case "critical":
-		return "❌ 严重"
+		return "严重"
 	case "warning":
-		return "⚠️ 警告"
+		return "警告"
 	default:
-		return "✅"
+		return "正常"
 	}
 }
 
@@ -371,20 +371,18 @@ func (m *reportModel) StyleCell(c *walk.CellStyle) {
 	if c.Row() < 0 || c.Row() >= len(m.rows) {
 		return
 	}
+	// 状态由文字承载，颜色只做克制的字色区分，不铺整行糖果色背景——
+	// 保留 walk 默认的交替行斑马纹，红/黄/绿整行涂色会让表格像交通灯。
 	r := m.rows[c.Row()]
 	switch r.severity {
 	case "critical":
-		c.BackgroundColor = walk.RGB(0xEE, 0x90, 0x90)
-		c.TextColor = walk.RGB(0x99, 0x00, 0x00)
+		c.TextColor = walk.RGB(0xB0, 0x20, 0x20) // 暗红，可读且不刺眼
 	case "warning":
-		c.BackgroundColor = walk.RGB(0xEE, 0xD0, 0x80)
-		c.TextColor = walk.RGB(0xB0, 0x60, 0x00)
+		c.TextColor = walk.RGB(0x9A, 0x60, 0x00) // 暗琥珀
 	case "unknown":
-		c.BackgroundColor = walk.RGB(0xE8, 0xE8, 0xE8)
-		c.TextColor = walk.RGB(0x55, 0x55, 0x55)
+		c.TextColor = walk.RGB(0x70, 0x70, 0x70) // 中性灰
 	default:
-		c.BackgroundColor = walk.RGB(0xEE, 0xF7, 0xEE)
-		c.TextColor = walk.RGB(0x22, 0x66, 0x22)
+		c.TextColor = walk.RGB(0x2F, 0x6B, 0x3A) // 灰绿（正常态，非饱和绿）
 	}
 }
 
@@ -630,13 +628,13 @@ func isSMARTApplicable(d smart.Disk) bool {
 func alertBannerText(disks []smart.Disk, vs []health.Violation) string {
 	if len(vs) == 0 {
 		if unread := unreadSMARTCount(disks); unread > 0 {
-			lines := []string{fmt.Sprintf("⚠️ %d 块磁盘未读取到 SMART 数据，无法得出完整健康结论", unread)}
+			lines := []string{fmt.Sprintf("%d 块磁盘未读取到 SMART 数据，无法得出完整健康结论", unread)}
 			return strings.Join(append(lines, unreadSMARTDetails(disks)...), "\n")
 		}
 		if smartApplicableCount(disks) == 0 {
-			return "ℹ️ 未发现支持 SMART 的物理磁盘"
+			return "未发现支持 SMART 的物理磁盘"
 		}
-		return "✅ 所有监测的 SMART 指标均处于安全范围"
+		return "所有监测的 SMART 指标均处于安全范围"
 	}
 	var lines []string
 	shown, extra := 0, 0
@@ -645,11 +643,11 @@ func alertBannerText(disks []smart.Disk, vs []health.Violation) string {
 			extra++
 			continue
 		}
-		mark := "⚠️"
+		mark := "警告"
 		if v.Severity == "critical" {
-			mark = "❌"
+			mark = "严重"
 		}
-		lines = append(lines, fmt.Sprintf("  %s [Disk%d] %s: %s (阈值 %s)",
+		lines = append(lines, fmt.Sprintf("  [%s] [Disk%d] %s: %s (阈值 %s)",
 			mark, v.DiskIndex, v.AttrName, v.Current, v.Limit))
 		shown++
 	}
@@ -657,7 +655,7 @@ func alertBannerText(disks []smart.Disk, vs []health.Violation) string {
 		lines = append(lines, fmt.Sprintf("  …及另外 %d 项异常，详见下方表格", extra))
 	}
 	if unread := unreadSMARTCount(disks); unread > 0 {
-		lines = append(lines, fmt.Sprintf("  ⚠️ %d 块磁盘未读取到 SMART 数据", unread))
+		lines = append(lines, fmt.Sprintf("  %d 块磁盘未读取到 SMART 数据", unread))
 		lines = append(lines, unreadSMARTDetails(disks)...)
 	}
 	return strings.Join(lines, "\n")
@@ -756,7 +754,7 @@ func (rw *ReportWin) rescanWith(discover func() ([]smart.Disk, error)) {
 			case outcome.err != nil:
 				rw.showStatus("扫描失败："+outcome.err.Error(), walk.RGB(0xB0, 0x20, 0x20))
 			case len(outcome.disks) == 0:
-				rw.showStatus("⚠ 未找到任何物理磁盘。", walk.RGB(0xB0, 0x60, 0x00))
+				rw.showStatus("未找到任何物理磁盘。", walk.RGB(0xB0, 0x60, 0x00))
 			default:
 				if err := rw.setReportData(outcome.disks); err != nil {
 					rw.showStatus("刷新失败："+err.Error(), walk.RGB(0xB0, 0x20, 0x20))
@@ -771,7 +769,7 @@ func (rw *ReportWin) simulateFailures() {
 		rw.showStatus("模拟失败："+err.Error(), walk.RGB(0xB0, 0x20, 0x20))
 		return
 	}
-	rw.showStatus("🧪 模拟异常验证（仅内存数据；点击“重新扫描”恢复真实磁盘）", walk.RGB(0xB0, 0x60, 0x00))
+	rw.showStatus("模拟异常验证（仅内存数据；点击“重新扫描”恢复真实磁盘）", walk.RGB(0xB0, 0x60, 0x00))
 }
 
 // showStatus 将操作结果直接写入主窗口横幅，避免模态对话框阻塞界面。
@@ -800,6 +798,7 @@ func (rw *ReportWin) setActionsEnabled(enabled bool) {
 }
 
 // reportTitle 生成随健康状态变化的窗口标题，让任务栏也能看出是否有严重告警。
+// 状态用文字而非 emoji 表达（emoji 在不同字号/主题下渲染不一，且装饰性过强）。
 func reportTitle(vs []health.Violation) string {
 	critical, warnings := 0, 0
 	for _, v := range vs {
@@ -811,11 +810,11 @@ func reportTitle(vs []health.Violation) string {
 	}
 	switch {
 	case critical > 0:
-		return fmt.Sprintf("❌ S.M.A.R.T 健康检查报告 — %d 项严重告警", critical)
+		return fmt.Sprintf("S.M.A.R.T 健康检查报告 — %d 项严重告警", critical)
 	case warnings > 0:
-		return fmt.Sprintf("⚠️ S.M.A.R.T 健康检查报告 — %d 项警告", warnings)
+		return fmt.Sprintf("S.M.A.R.T 健康检查报告 — %d 项警告", warnings)
 	default:
-		return "✅ S.M.A.R.T 健康检查报告"
+		return "S.M.A.R.T 健康检查报告"
 	}
 }
 
@@ -845,10 +844,17 @@ func (rw *ReportWin) setReportData(disks []smart.Disk) error {
 			return err
 		}
 	}
-	if strings.Contains(title, "❌") && !strings.Contains(rw.lastTitle, "❌") {
+	hasCritical := false
+	for _, v := range rw.violations {
+		if v.Severity == health.Critical {
+			hasCritical = true
+			break
+		}
+	}
+	if hasCritical && !rw.lastHadCritical {
 		alertBeep()
 	}
-	rw.lastTitle = title
+	rw.lastHadCritical = hasCritical
 	return nil
 }
 
